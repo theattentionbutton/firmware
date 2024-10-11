@@ -1,14 +1,20 @@
 from PIL import Image
 import os
+import sys
 
 # Set the directory path and the output C file
-directory = os.getcwd()
-output_file = "icons.c"
+d = os.getcwd()
+input_dir = os.path.join(d, "icons")
+output_file = sys.argv[1]
+
+if not output_file:
+    print("convert: error: no output file supplied", file=sys.stderr)
+    exit(1)
 
 icons = dict()
 drawables = []
 # Open the output C file
-for idx, filename in enumerate(os.listdir(directory)):
+for idx, filename in enumerate(os.listdir(input_dir)):
     if not filename.endswith(".png"):
         continue
 
@@ -17,7 +23,7 @@ for idx, filename in enumerate(os.listdir(directory)):
         cleaned = filename.replace("D_", "", 1)
         drawables.append(cleaned)
 
-    img = Image.open(os.path.join(directory, filename))
+    img = Image.open(os.path.join(input_dir, filename))
     img = img.convert("1")
     # Resize the image to 8x8 if necessary
     if img.size != (8, 8):
