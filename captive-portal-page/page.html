@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Attention Button - Setup</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <h1>The Attention Button - settings</h1>
+
+    <p>
+        Set your room secret and Wi-Fi settings here to pair The Attention Button with your partner's.
+    </p>
+
+    <details id="secret-menu" open aria-role=form>
+        <summary>Set room secret</summary>
+        <div id="username-group" class=form-group>
+            <label for="username">Your theattentionbutton.in username</label>
+            <input type="text" id="username">
+        </div>
+
+        <aside>Tip: paste the entire secret phrase into any field.</aside>
+
+        <div id="secret-container">
+            <label for="secret-token-first" class="hidden">Secret Token first part</label>
+            <input placeholder="First word" type="text" id="secret-token-first">
+
+            <label for="secret-token-second" class="hidden">Secret Token second part</label>
+            <input placeholder="Second word" type="text" id="secret-token-second">
+
+            <label for="secret-token-third" class="hidden">Secret Token third part</label>
+            <input placeholder="Third word" type="text" id="secret-token-third">
+
+            <label for="secret-token-fourth" class="hidden">Secret Token fourth part</label>
+            <input placeholder="Fourth word" type="text" id="secret-token-fourth">
+        </div>
+        <div id="secret-controls">
+            <button type="button" id="secret-token-submit">Set</button>
+        </div>
+    </details>
+
+    <details id="wifi-menu" open>
+        <summary>
+            Wi-Fi settings
+        </summary>
+
+        <div class="wifi-form-wrapper" aria-role="form">
+            <aside>Enter your Wi-Fi network's credentials. Don't worry, these never leave the device.</aside>
+
+            <div class="networks-container">
+                <div class="networks-container-label">Available networks</div>
+                <section class="networks">
+
+                </section>
+
+                <aside>If your network doesn't show up in the list, try restarting the device or moving it closer to
+                    your router.</aside>
+            </div>
+
+            <div aria-role=form id="wifi-form">
+                <div class=form-group>
+                    <label for="wifi-ssid">Network name</label>
+                    <input type="text" id="wifi-ssid">
+                </div>
+                <div class=form-group>
+                    <label for="wifi-psk">Network password</label>
+                    <input type="password" id="wifi-psk">
+                </div>
+                <div class="submit-group">
+                    <button id="wifi-submit" type="button" aria-role="submit">Set</button>
+                </div>
+            </div>
+        </div>
+
+    </details>
+    <script src="main.js"></script>
+</body>
+
+</html>

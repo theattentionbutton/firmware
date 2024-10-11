@@ -1,0 +1,22 @@
+{
+    "name": "captive-portal-page",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/html-minifier": "^4.0.5",
+        "@types/minify": "^9.1.4",
+        "campfire.js": "4.0.0-alpha3",
+        "cf-alert": "^0.4.1",
+        "esbuild": "^0.23.0",
+        "html-minifier": "^4.0.0",
+        "html5-qrcode": "^2.3.8",
+        "qr-scanner": "^1.4.2"
+    }
+}
