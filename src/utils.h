@@ -1,8 +1,5 @@
 #include "icons.h"
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <NetworkClientSecure.h>
-
 #ifndef __CLIENT_UTILS
 #define __CLIENT_UTILS
 
