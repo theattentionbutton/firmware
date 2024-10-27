@@ -1,5 +1,14 @@
 #include "icons.h"
 #include <ArduinoJson.h>
+
+#if defined(ESP8266)
+#define WIFI_AUTH_OPEN AUTH_OPEN
+#define WIFI_AUTH_WEP AUTH_WEP
+#define WIFI_AUTH_WPA_PSK AUTH_WPA_PSK
+#define WIFI_AUTH_WPA2_PSK AUTH_WPA2_PSK
+#define WIFI_AUTH_WPA_WPA2_PSK AUTH_WPA_WPA2_PSK
+#endif
+
 #ifndef __CLIENT_UTILS
 #define __CLIENT_UTILS
 
@@ -7,6 +16,11 @@
 #define ROUTE(x) (REMOTE_URL x)
 
 typedef enum button_mode_t { SETUP_MODE = 0, CLIENT_MODE } EButtonMode;
+
+#ifndef ESP_ARDUINO_VERSION_VAL
+#define ESP_ARDUINO_VERSION_VAL(major, minor, patch)                           \
+    ((major << 16) | (minor << 8) | (patch))
+#endif
 
 void set_clock() {
     configTime(0, 0, "pool.ntp.org");
@@ -39,14 +53,16 @@ const char *wifi_auth_mode(int auth_mode) {
             return "WPA2";
         case WIFI_AUTH_WPA_WPA2_PSK:
             return "WPA/WPA2";
-        case WIFI_AUTH_WPA2_ENTERPRISE:
-            return "WPA2 (enterprise)";
+#if defined(ESP32)
         case WIFI_AUTH_WPA3_PSK:
             return "WPA3";
         case WIFI_AUTH_WPA2_WPA3_PSK:
             return "WPA2/WPA3";
+        case WIFI_AUTH_WPA2_ENTERPRISE:
+            return "WPA2 (enterprise)";
         case WIFI_AUTH_WAPI_PSK:
             return "WAPI";
+#endif
         default:
             return "Unknown";
     }

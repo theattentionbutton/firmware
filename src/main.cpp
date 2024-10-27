@@ -2,19 +2,40 @@
 #include "captive_portal_server.h"
 #include "cert.h"
 #include "utils.h"
-#include <AsyncTCP.h>
 #include <DNSServer.h>
-#include <ESPAsyncWebSrv.h>
-#include <HTTPClient.h>
 #include <MATRIX7219.h>
-#include <SPIFFS.h>
-#include <esp_wifi.h>
 
-MATRIX7219 mx(17 /* data pin */, 16 /* select pin */, 15 /* clock pin */,
-              1 /* number of matrices */);
+#if defined(ESP32)
 
-#define BUTTON 22
-#define FORMAT_SPIFFS_IF_FAILED true
+#include <HTTPClient.h>
+#define FORMAT_LITTLEFS_ON_ERR true
+
+#elif defined(ESP8266)
+
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+#define NetworkClientSecure WiFiClientSecure
+#define FORMAT_LITTLEFS_ON_ERR
+
+#endif
+
+#define MATRIX_CNT 1 // matrix count
+
+#if defined(ESP32)
+#define MATRIX_DAT 17
+#define MATRIX_SEL 16
+#define MATRIX_CLK 15
+#define BTN_PIN 22
+#elif defined(ESP8266)
+#define MATRIX_DAT 4
+#define MATRIX_SEL 14
+#define MATRIX_CLK 5
+#define BTN_PIN 10
+#else
+#error "Building for unknown platform, bailing..."
+#endif
+
+MATRIX7219 mx(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
 
 #define MIN_ATTENTION_INTERVAL 1000
 #define POLL_DELAY 10000
@@ -42,15 +63,15 @@ void setup() {
     while (!Serial);
     Serial.println("Starting...");
 
-    pinMode(BUTTON, INPUT_PULLUP);
+    pinMode(BTN_PIN, INPUT_PULLUP);
     pinMode(2, OUTPUT);
 
-    if (!SPIFFS.begin(true)) {
-        Serial.printf("Error initialising SPIFFS!\n");
+    if (!LittleFS.begin(FORMAT_LITTLEFS_ON_ERR)) {
+        Serial.printf("Error initialising filesystem!\n");
         while (1);
     }
 
-    attachInterrupt(BUTTON, attn_request, FALLING);
+    attachInterrupt(BTN_PIN, attn_request, FALLING);
 }
 
 int wifi_connected = 0;
@@ -78,12 +99,20 @@ int setup_wifi(char *ssid, char *psk) {
 
 unsigned long last_poll_time = 0;
 
+#if defined(ESP8266)
+X509List root_ca_x509(ROOT_CA_CERT);
+#endif
+
 template <typename ResponseHandler>
 int hit_server(const char *route, ResponseHandler handler) {
     NetworkClientSecure *client = new NetworkClientSecure();
     int id = 0;
     if (!client) return id;
+#if defined(ESP32)
     client->setCACert(ROOT_CA_CERT);
+#elif defined(ESP8266)
+    client->setTrustAnchors(&root_ca_x509);
+#endif
     {
         HTTPClient https;
         if (!https.begin(*client, route)) goto cleanup;
@@ -105,7 +134,7 @@ unsigned long last_request_time = 0;
 
 void loop() {
     unsigned long now = millis();
-    int bstate = !digitalRead(BUTTON);
+    int bstate = !digitalRead(BTN_PIN);
     if (now < 2000 && mode != SETUP_MODE && bstate) {
         Serial.println("Entering wifi mode...");
         digitalWrite(2, HIGH);
@@ -156,7 +185,7 @@ void loop() {
                                           String response = https.getString();
                                           JsonDocument doc;
                                           deserializeJson(doc, response);
-                                          if (!doc.containsKey("icon_id"))
+                                          if (!doc["icon_id"].is<int>())
                                               return 0;
                                           int id = doc["icon_id"];
                                           return id;
