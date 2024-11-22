@@ -1,8 +1,10 @@
+#include "FS.h"
 #include "captive_portal.h"
 #include "captive_portal_index.h"
 #include "littlefs_kv.h"
 #include "utils.h"
 #include <ESPAsyncWebSrv.h>
+#include <flash_hal.h>
 
 #ifndef __CAPTIVE_PORTAL_SERVER
 #define __CAPTIVE_PORTAL_SERVER
@@ -71,6 +73,50 @@ char routes_404[][32] = {
     "/chat",     // No stop asking Whatsapp, there is no internet connection
     "/favicon.ico"};
 
+void handleUpdateUpload(AsyncWebServerRequest *request, String filename,
+                        size_t index, uint8_t *data, size_t len, bool final) {
+    size_t content_length = request->contentLength();
+    if (!index) {
+        if (!request->hasParam("MD5", true)) {
+            return request->send(400, "text/plain", "MD5 parameter missing");
+        }
+
+        if (!Update.setMD5(request->getParam("MD5", true)->value().c_str())) {
+            return request->send(400, "text/plain", "MD5 parameter invalid");
+        }
+
+        if (!Update.begin(content_length, U_FLASH)) {
+            Update.printError(Serial);
+        }
+    }
+
+    for (size_t i = 0; i < len; i++) {
+        if (Update.write(data, len) != len) {
+            Update.printError(Serial);
+        }
+
+        else {
+            Serial.printf("Progress: %d%%\n",
+                          (Update.progress() * 100) / Update.size());
+        }
+    }
+
+    if (final) {
+        AsyncWebServerResponse *response = request->beginResponse(
+            302, "application/json", "Please wait while the device reboots");
+        response->addHeader("Refresh", "20");
+        response->addHeader("Location", "/");
+        request->send(response);
+        if (!Update.end(true)) {
+            Update.printError(Serial);
+        } else {
+            Serial.println("Update complete");
+            Serial.flush();
+            ESP.restart();
+        }
+    }
+}
+
 void set_up_webserver(AsyncWebServer &server, const String &scanResults,
                       const IPAddress &local_ip) {
     //======================== Webserver ========================
@@ -119,6 +165,11 @@ void set_up_webserver(AsyncWebServer &server, const String &scanResults,
             request->beginResponse(200, "application/json", scanResults);
         request->send(res);
     });
+
+    server.on(
+        "/update", HTTP_POST,
+        [](AsyncWebServerRequest *request) { request->send(200); },
+        handleUpdateUpload);
 
     DEFINE_RU_ROUTE("/secret", "secret", 64 - 1);
     DEFINE_RU_ROUTE("/psk", "psk", 64 - 1);
