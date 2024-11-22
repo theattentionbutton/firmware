@@ -150,7 +150,7 @@ void loop() {
             mode = SETUP_MODE;
             return;
         } else {
-            Serial.println("Entering setup mode...");
+            Serial.println("Entering client mode...");
         }
     }
 
