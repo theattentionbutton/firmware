@@ -21,16 +21,18 @@
 
 #define MATRIX_CNT 1 // matrix count
 
+#define ENC_DAT 14
+#define ENC_CLK 10
+#define ENC_SW 13
+
 #if defined(ESP32)
 #define MATRIX_DAT 17
 #define MATRIX_SEL 16
 #define MATRIX_CLK 15
-#define BTN_PIN 22
 #elif defined(ESP8266)
-#define MATRIX_DAT 4
-#define MATRIX_SEL 14
-#define MATRIX_CLK 5
-#define BTN_PIN 10
+#define MATRIX_CLK 4
+#define MATRIX_DAT 5
+#define MATRIX_SEL 16
 #else
 #error "Building for unknown platform, bailing..."
 #endif
@@ -63,7 +65,7 @@ void setup() {
     while (!Serial);
     Serial.println("Starting...");
 
-    pinMode(BTN_PIN, INPUT_PULLUP);
+    pinMode(ENC_SW, INPUT_PULLUP);
     pinMode(2, OUTPUT);
 
     if (!LittleFS.begin(FORMAT_LITTLEFS_ON_ERR)) {
@@ -71,7 +73,7 @@ void setup() {
         while (1);
     }
 
-    attachInterrupt(BTN_PIN, attn_request, FALLING);
+    attachInterrupt(ENC_SW, attn_request, FALLING);
 }
 
 int wifi_connected = 0;
@@ -134,7 +136,7 @@ unsigned long last_request_time = 0;
 
 void loop() {
     unsigned long now = millis();
-    int bstate = !digitalRead(BTN_PIN);
+    int bstate = !digitalRead(ENC_SW);
     if (now < 2000 && mode != SETUP_MODE && bstate) {
         Serial.println("Entering wifi mode...");
         digitalWrite(2, HIGH);
