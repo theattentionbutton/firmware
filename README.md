@@ -12,3 +12,7 @@ pnpm i
 cd ..
 make
 ```
+
+## TODO:
+
+- kick back into setup mode when credentials not set

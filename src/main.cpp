@@ -24,6 +24,7 @@
 #define ENC_DAT 14
 #define ENC_CLK 10
 #define ENC_SW 13
+#define BZ1 12
 
 #if defined(ESP32)
 #define MATRIX_DAT 17
@@ -65,15 +66,20 @@ void setup() {
     while (!Serial);
     Serial.println("Starting...");
 
-    pinMode(ENC_SW, INPUT_PULLUP);
-    pinMode(2, OUTPUT);
+    pinMode(ENC_SW, INPUT);
+    pinMode(ENC_DAT, INPUT);
+    pinMode(ENC_CLK, INPUT);
+    pinMode(MATRIX_SEL, OUTPUT);
+    pinMode(MATRIX_CLK, OUTPUT);
+    pinMode(MATRIX_DAT, INPUT);
+    pinMode(BZ1, OUTPUT);
 
     if (!LittleFS.begin(FORMAT_LITTLEFS_ON_ERR)) {
         Serial.printf("Error initialising filesystem!\n");
         while (1);
     }
 
-    attachInterrupt(ENC_SW, attn_request, FALLING);
+    attachInterrupt(digitalPinToInterrupt(ENC_SW), attn_request, FALLING);
 }
 
 int wifi_connected = 0;
@@ -137,11 +143,15 @@ unsigned long last_request_time = 0;
 void loop() {
     unsigned long now = millis();
     int bstate = !digitalRead(ENC_SW);
-    if (now < 2000 && mode != SETUP_MODE && bstate) {
-        Serial.println("Entering wifi mode...");
-        digitalWrite(2, HIGH);
-        mode = SETUP_MODE;
-        return;
+    if (now < 2000) {
+        if ((mode != SETUP_MODE) && bstate) {
+            Serial.println("Entering setup mode...");
+            digitalWrite(2, HIGH);
+            mode = SETUP_MODE;
+            return;
+        } else {
+            Serial.println("Entering setup mode...");
+        }
     }
 
     switch (mode) {
