@@ -83,9 +83,7 @@ with open(output_file, "w") as f:
         f.write(f" // {key}\n")
     f.write("};\n\n")
 
-    f.write("#define ICONS_LENGTH (sizeof(ICONS)/sizeof(ICONS[0]))\n\n")
+    f.write("#define ICONS_LENGTH (sizeof(ICONS)/sizeof(ICONS[0]))\n")
 
-    f.write("const byte *icon(IconId i) {\n")
-    f.write("    return ICONS[i - 1];\n")
-    f.write("}\n")
+    f.write("#define ICON(id) ICONS[id - 1]\n")
     f.write("\n#endif\n")
