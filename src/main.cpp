@@ -38,7 +38,7 @@
 #error "Building for unknown platform, bailing..."
 #endif
 
-MATRIX7219 mx(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
+MATRIX7219 *mx;
 
 #define MIN_ATTENTION_INTERVAL 1000
 #define POLL_DELAY 10000
@@ -52,7 +52,7 @@ const IPAddress subnetMask(255, 255, 255, 0);
 DNSServer dns;
 AsyncWebServer server(80);
 
-int was_wifi_setup = 0;
+int was_ap_setup = 0;
 unsigned long button_pressed_at = 0;
 EButtonMode mode = CLIENT_MODE;
 
@@ -61,7 +61,10 @@ int need_to_post = 0;
 void IRAM_ATTR attn_request() { need_to_post = 1; }
 
 void setup() {
+    wdt_enable(0u);
     Serial.begin(9600);
+
+    mx = new MATRIX7219(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
 
     while (!Serial);
     Serial.println("Starting...");
@@ -69,10 +72,12 @@ void setup() {
     pinMode(ENC_SW, INPUT);
     pinMode(ENC_DAT, INPUT);
     pinMode(ENC_CLK, INPUT);
-    pinMode(MATRIX_SEL, OUTPUT);
-    pinMode(MATRIX_CLK, OUTPUT);
-    pinMode(MATRIX_DAT, INPUT);
     pinMode(BZ1, OUTPUT);
+
+    mx->begin();
+    mx->clear();
+    mx->setBrightness(3);
+    mx->setReverse(1);
 
     if (!LittleFS.begin(FORMAT_LITTLEFS_ON_ERR)) {
         Serial.printf("Error initialising filesystem!\n");
@@ -89,11 +94,8 @@ char psk[64] = {0};
 char secret[64] = {0};
 char username[255] = {0};
 
-#define FETCH_IF_EMPTY(variable, max_len, error)                               \
-    if (!variable[0]) {                                                        \
-        size_t len = kv_get(#variable, variable, max_len);                     \
-        if (!len) fatal_error(error);                                          \
-    }
+#define FETCH(variable, max_len, yes, no)                                      \
+    kv_get(#variable, variable, max_len) ? yes : no
 
 int setup_wifi(char *ssid, char *psk) {
     if (wifi_connected) return 1;
@@ -143,21 +145,23 @@ unsigned long last_request_time = 0;
 void loop() {
     unsigned long now = millis();
     int bstate = !digitalRead(ENC_SW);
+
     if (now < 2000) {
-        if ((mode != SETUP_MODE) && bstate) {
+        if (((mode != SETUP_MODE) && bstate) || mode == SETUP_MODE) {
             Serial.println("Entering setup mode...");
             digitalWrite(2, HIGH);
             mode = SETUP_MODE;
             return;
-        } else {
+        } else if (mode == CLIENT_MODE) {
             Serial.println("Entering client mode...");
         }
     }
 
     switch (mode) {
         case SETUP_MODE: {
-            if (!was_wifi_setup) {
-                was_wifi_setup = 1;
+            draw_icon(SETTINGS, mx);
+            if (!was_ap_setup) {
+                was_ap_setup = 1;
                 start_soft_ap(CAPTIVE_SSID, CAPTIVE_PWD, local_ip, gateway_ip);
                 setup_dns_server(dns, local_ip);
                 String scan_results = scan_wifi_networks();
@@ -173,11 +177,14 @@ void loop() {
         }
 
         case CLIENT_MODE: {
-            FETCH_IF_EMPTY(ssid, 63, CONNECTION_ERROR);
-            FETCH_IF_EMPTY(psk, 63, CONNECTION_ERROR);
-            FETCH_IF_EMPTY(secret, 63, CREDENTIALS_ERROR);
-            FETCH_IF_EMPTY(username, 254, CREDENTIALS_ERROR);
-            if (!wifi_connected && !setup_wifi(ssid, psk)) return;
+            mode = FETCH(ssid, 63, CLIENT_MODE, SETUP_MODE);
+            mode = FETCH(psk, 63, CLIENT_MODE, SETUP_MODE);
+            mode = FETCH(secret, 63, CLIENT_MODE, SETUP_MODE);
+            mode = FETCH(username, 254, CLIENT_MODE, SETUP_MODE);
+            if (mode != CLIENT_MODE) return;
+            if (!wifi_connected && !setup_wifi(ssid, psk)) {
+                fatal_error(CONNECTION_ERROR, mx);
+            }
 
             if (need_to_post &&
                 now - last_request_time > MIN_ATTENTION_INTERVAL) {
