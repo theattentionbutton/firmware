@@ -1,5 +1,6 @@
 #include "icons.h"
 #include <ArduinoJson.h>
+#include <MATRIX7219.h>
 
 #if defined(ESP8266)
 #define WIFI_AUTH_OPEN AUTH_OPEN
@@ -97,11 +98,19 @@ String scan_wifi_networks() {
     return scan_results;
 }
 
-void draw_icon(IconId id) {}
+void draw_icon(IconId id, MATRIX7219 *mx) {
+    const byte *icon = ICON(id);
+    for (int i = 0; i < 8; i++) {
+        mx->setRow(i + 1, icon[i], 0);
+    }
+}
 
-void fatal_error(IconId id) {
-    Serial.printf("%d\n", id);
-    while (1);
+void fatal_error(IconId id, MATRIX7219 *mx) {
+    draw_icon(id, mx);
+    while (1) {
+        delay(50);
+        wdt_reset();
+    }
 }
 
 void loading_screen(const char *msg) {
