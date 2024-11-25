@@ -42,10 +42,10 @@ void start_soft_ap(const char *ssid, const char *password,
     WiFi.mode(WIFI_MODE_APSTA);
 
     // Define the subnet mask for the WiFi network
-    const IPAddress subnetMask(255, 255, 255, 0);
+    const IPAddress subnet_mask(255, 255, 255, 0);
 
     // Configure the soft access point with a specific IP and subnet mask
-    WiFi.softAPConfig(local_ip, gateway_ip, subnetMask);
+    WiFi.softAPConfig(local_ip, gateway_ip, subnet_mask);
 
     // Start the soft access point with the given ssid, password, channel, max
     // number of clients
