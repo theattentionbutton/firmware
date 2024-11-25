@@ -75,7 +75,7 @@ with open(output_file, "w") as f:
         " (sizeof(DRAWABLE_ICONS)/sizeof(DRAWABLE_ICONS[0]))\n\n"
     )
 
-    f.write(f"const byte ICONS[{len(icons)}][8] = {{\n")
+    f.write(f"const byte ICONS[{len(icons)}][8] PROGMEM = {{\n")
     for idx, (key, value) in enumerate(icons.items()):
         f.write("    " + str(value).replace("[", "{").replace("]", "}"))
         if not idx == len(icons) - 1:

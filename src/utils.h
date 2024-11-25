@@ -99,9 +99,9 @@ String scan_wifi_networks() {
 }
 
 void draw_icon(IconId id, MATRIX7219 *mx) {
-    const byte *icon = ICON(id);
     for (int i = 0; i < 8; i++) {
-        mx->setRow(i + 1, icon[i], 0);
+        uint8_t b = pgm_read_byte((void *)ICON(id) + i);
+        mx->setRow(i + 1, b, 0);
     }
 }
 
