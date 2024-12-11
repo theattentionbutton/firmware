@@ -1,7 +1,7 @@
 {
   "imports": {
     "@std/path": "jsr:@std/path@^1.0.8",
-    "@tonejs/midi": "https://esm.sh/@tonejs/midi@^2.0.28",
+    "@tonejs/midi": "https://esm.sh/@tonejs/midi@2.0.28",
     "sharp": "npm:sharp@^0.33.5"
   }
 }

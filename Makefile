@@ -1,7 +1,7 @@
-.PHONY: all icons build_html build_project
+.PHONY: all icons midis build_html build_project
 
 # Grouped build tasks for convenience
-all: icons build_html build_project
+all: icons midis build_html build_project
 
 # Build HTML and assets for the captive portal page
 build_html:
@@ -14,3 +14,6 @@ build_project:
 # Generate icons from source (triggered if needed)
 icons:
 	deno run -A scripts/make-icons.ts -- ./src/icons.h
+
+midis:
+	deno run -A scripts/make-midis.ts -- ./src/midis.h
