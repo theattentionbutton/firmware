@@ -13,4 +13,4 @@ build_project:
 
 # Generate icons from source (triggered if needed)
 icons:
-	python3 icons/convert.py ./src/icons.h
+	deno run -A scripts/make-icons.ts -- ./src/icons.h
