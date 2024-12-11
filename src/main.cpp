@@ -47,7 +47,7 @@ MATRIX7219 *mx;
 
 const IPAddress local_ip(4, 3, 2, 1);   // the IP address for the web server
 const IPAddress gateway_ip(4, 3, 2, 1); // IP address of the network
-const IPAddress subnetMask(255, 255, 255, 0);
+const IPAddress subnet_mask(255, 255, 255, 0);
 
 DNSServer dns;
 AsyncWebServer server(80);
@@ -142,75 +142,84 @@ cleanup:
 
 unsigned long last_request_time = 0;
 
+int printed = 0;
+
+void setup_iter() {
+    draw_icon(SETTINGS, mx);
+    if (!was_ap_setup) {
+        was_ap_setup = 1;
+        start_soft_ap(CAPTIVE_SSID, CAPTIVE_PWD, local_ip, gateway_ip);
+        setup_dns_server(dns, local_ip);
+        String scan_results = scan_wifi_networks();
+        Serial.println(scan_results);
+        set_up_webserver(server, scan_results, local_ip);
+        server.begin();
+        return;
+    }
+
+    dns.processNextRequest();
+}
+
+int response_action(HTTPClient &https, int code) {
+    if (code != 200) return 0;
+    String response = https.getString();
+    JsonDocument doc;
+    deserializeJson(doc, response);
+    if (!doc["icon_id"].is<int>()) return 0;
+    int id = doc["icon_id"];
+    return id;
+}
+
+void client_iter(unsigned long now) {
+    mode = FETCH(ssid, 63, CLIENT_MODE, SETUP_MODE);
+    mode = FETCH(psk, 63, CLIENT_MODE, SETUP_MODE);
+    mode = FETCH(secret, 63, CLIENT_MODE, SETUP_MODE);
+    mode = FETCH(username, 254, CLIENT_MODE, SETUP_MODE);
+    if (mode != CLIENT_MODE) return;
+    if (!wifi_connected && !setup_wifi(ssid, psk)) {
+        fatal_error(CONNECTION_ERROR, mx);
+    }
+
+    if (need_to_post && now - last_request_time > MIN_ATTENTION_INTERVAL) {
+        last_request_time = now;
+        need_to_post = 0;
+        Serial.println("requesting attention");
+        int status =
+            hit_server(ROUTE("/request-attention"),
+                       [](HTTPClient &https, int code) { return code == 200; });
+    } else if (now - last_poll_time >= POLL_DELAY) { // poll every n seconds
+        last_poll_time = now;
+        Serial.println("querying for messages");
+        int icon = hit_server(ROUTE("/list-messages"), response_action);
+    }
+}
+
 void loop() {
     unsigned long now = millis();
     int bstate = !digitalRead(ENC_SW);
 
     if (now < 2000) {
         if (((mode != SETUP_MODE) && bstate) || mode == SETUP_MODE) {
-            Serial.println("Entering setup mode...");
+            if (!printed) Serial.println("Entering setup mode...");
             digitalWrite(2, HIGH);
             mode = SETUP_MODE;
             return;
         } else if (mode == CLIENT_MODE) {
-            Serial.println("Entering client mode...");
+            if (!printed) Serial.println("Entering client mode...");
         }
+
+        printed = 1;
     }
 
     switch (mode) {
         case SETUP_MODE: {
-            draw_icon(SETTINGS, mx);
-            if (!was_ap_setup) {
-                was_ap_setup = 1;
-                start_soft_ap(CAPTIVE_SSID, CAPTIVE_PWD, local_ip, gateway_ip);
-                setup_dns_server(dns, local_ip);
-                String scan_results = scan_wifi_networks();
-                Serial.println(scan_results);
-                set_up_webserver(server, scan_results, local_ip);
-                server.begin();
-                return;
-            }
-
-            dns.processNextRequest();
+            setup_iter();
             delay(DNS_INTERVAL);
             break;
         }
 
         case CLIENT_MODE: {
-            mode = FETCH(ssid, 63, CLIENT_MODE, SETUP_MODE);
-            mode = FETCH(psk, 63, CLIENT_MODE, SETUP_MODE);
-            mode = FETCH(secret, 63, CLIENT_MODE, SETUP_MODE);
-            mode = FETCH(username, 254, CLIENT_MODE, SETUP_MODE);
-            if (mode != CLIENT_MODE) return;
-            if (!wifi_connected && !setup_wifi(ssid, psk)) {
-                fatal_error(CONNECTION_ERROR, mx);
-            }
-
-            if (need_to_post &&
-                now - last_request_time > MIN_ATTENTION_INTERVAL) {
-                last_request_time = now;
-                need_to_post = 0;
-                Serial.println("requesting attention");
-                int status = hit_server(
-                    ROUTE("/request-attention"),
-                    [](HTTPClient &https, int code) { return code == 200; });
-            } else if (now - last_poll_time >=
-                       POLL_DELAY) { // poll every n seconds
-                last_poll_time = now;
-                Serial.println("querying for messages");
-                int icon = hit_server(ROUTE("/list-messages"),
-                                      [](HTTPClient &https, int code) {
-                                          if (code != 200) return 0;
-                                          String response = https.getString();
-                                          JsonDocument doc;
-                                          deserializeJson(doc, response);
-                                          if (!doc["icon_id"].is<int>())
-                                              return 0;
-                                          int id = doc["icon_id"];
-                                          return id;
-                                      });
-            }
-
+            client_iter(now);
             break;
         }
     }
