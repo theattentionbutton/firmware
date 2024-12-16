@@ -16,7 +16,7 @@
 #define REMOTE_URL "https://theattentionbutton.in"
 #define ROUTE(x) (REMOTE_URL x)
 
-typedef enum button_mode_t { SETUP_MODE = 0, CLIENT_MODE } EButtonMode;
+typedef enum button_mode_t { SETUP_MODE = 1, CLIENT_MODE } EButtonMode;
 
 #ifndef ESP_ARDUINO_VERSION_VAL
 #define ESP_ARDUINO_VERSION_VAL(major, minor, patch)                           \
