@@ -9,24 +9,10 @@
 #define ENC_CLK 10
 #define ENC_SW 13
 #define BZ1 12
-
-#if defined(ESP32)
-
-#define MATRIX_DAT 17
-#define MATRIX_SEL 16
-#define MATRIX_CLK 15
-#define FORMAT_LITTLEFS_ON_ERR true
-
-#elif defined(ESP8266)
-
 #define MATRIX_CLK 4
 #define MATRIX_DAT 5
 #define MATRIX_SEL 16
 #define FORMAT_LITTLEFS_ON_ERR
-
-#else
-#error "Building for unknown platform, bailing..."
-#endif
 
 #define MIN_ATTENTION_INTERVAL 1000
 #define POLL_DELAY 10000

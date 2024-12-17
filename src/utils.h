@@ -2,6 +2,8 @@
 #include <ArduinoJson.h>
 #include <MATRIX7219.h>
 
+#define BAUD_RATE 9600
+
 #if defined(ESP8266)
 #define WIFI_AUTH_OPEN AUTH_OPEN
 #define WIFI_AUTH_WEP AUTH_WEP
@@ -54,16 +56,6 @@ const char *wifi_auth_mode(int auth_mode) {
             return "WPA2";
         case WIFI_AUTH_WPA_WPA2_PSK:
             return "WPA/WPA2";
-#if defined(ESP32)
-        case WIFI_AUTH_WPA3_PSK:
-            return "WPA3";
-        case WIFI_AUTH_WPA2_WPA3_PSK:
-            return "WPA2/WPA3";
-        case WIFI_AUTH_WPA2_ENTERPRISE:
-            return "WPA2 (enterprise)";
-        case WIFI_AUTH_WAPI_PSK:
-            return "WAPI";
-#endif
         default:
             return "Unknown";
     }
@@ -85,7 +77,7 @@ String scan_wifi_networks() {
     JsonDocument doc;
     JsonArray results = doc["scan_results"].to<JsonArray>();
     int n = WiFi.scanNetworks();
-    for (int i = 0; i < n; i++) {
+    for (uint8_t i = 0; i < 255; i++) {
         JsonObject result = results.add<JsonObject>();
         result["rssi"] = WiFi.RSSI(i);
         result["ssid"] = WiFi.SSID(i);
@@ -99,7 +91,7 @@ String scan_wifi_networks() {
 }
 
 void draw_icon(IconId id, MATRIX7219 *mx) {
-    for (int i = 0; i < 8; i++) {
+    for (uint8_t i = 0; i < 8; i++) {
         uint8_t b = pgm_read_byte((void *)ICON(id) + i);
         mx->setRow(i + 1, b, 0);
     }

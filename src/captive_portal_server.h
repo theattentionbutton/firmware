@@ -20,7 +20,7 @@ const char *JSON_RESP_MISSING_VALUE = "{\"message\": \"missing-value\"}";
 
 // RU = Read, Update
 void handle_ru_route(AsyncWebServerRequest *request, const char *param,
-                     int max_len) {
+                     size_t max_len) {
     auto respond = [&request](int code, const char *content) {
         AsyncWebServerResponse *res =
             request->beginResponse(code, "application/json", content);
@@ -28,7 +28,6 @@ void handle_ru_route(AsyncWebServerRequest *request, const char *param,
     };
 
     if (request->method() == HTTP_POST) {
-        Serial.printf("Request has %u params\n", request->params());
         if (request->hasParam("value", true)) {
             String s = request->getParam("value", true)->value();
             if (s.length() > max_len) {
@@ -96,7 +95,7 @@ void handleUpdateUpload(AsyncWebServerRequest *request, String filename,
         }
 
         else {
-            Serial.printf("Progress: %d%%\n",
+            Serial.printf("[update] Progress: %d%%\n",
                           (Update.progress() * 100) / Update.size());
         }
     }
@@ -110,7 +109,7 @@ void handleUpdateUpload(AsyncWebServerRequest *request, String filename,
         if (!Update.end(true)) {
             Update.printError(Serial);
         } else {
-            Serial.println("Update complete");
+            Serial.println("[update] Update complete");
             Serial.flush();
             ESP.restart();
         }
