@@ -62,7 +62,7 @@ output.push(
     '    ' + Object.keys(icons).map(key => `"${key}"`).join(',\n    '),
     '};',
     '',
-    'const int DRAWABLE_ICONS[] PROGMEM = {',
+    'const IconId DRAWABLE_ICONS[] PROGMEM = {',
     ...drawables.map((drawable, idx) => {
         const delimiter = idx === drawables.length - 1 ? "" : ",";
         return `    ${drawable}${delimiter}`;
