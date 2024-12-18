@@ -1,17 +1,18 @@
 #include "captive_portal_server.h"
 #include "cert.h"
 #include "constants.h"
+#include "depends/ESPAsyncWebSrv.h"
 #include "littlefs_kv.h"
 #include "utils.h"
 #include <DNSServer.h>
 #include <ESP8266HTTPClient.h>
-#include <ESPAsyncWebSrv.h>
 #include <MATRIX7219.h>
 #include <WiFiClientSecure.h>
 #define NetworkClientSecure WiFiClientSecure
 X509List root_ca_x509(ROOT_CA_CERT);
 
 #include "captive_portal.h"
+#include "midis.h"
 
 #define FETCH(variable, max_len, yes, no)                                      \
     kv_get(#variable, variable, max_len) ? yes : no
@@ -52,7 +53,6 @@ int response_action(HTTPClient &https, int code) {
 
 class AttentionButton {
     MATRIX7219 *mx;
-    DNSServer *dns;
     AsyncWebServer *server;
     unsigned long last_button_press = 0;
     unsigned long last_poll_time = 0;
@@ -66,21 +66,31 @@ class AttentionButton {
     char username[255] = {0};
 
   public:
+    DNSServer *dns;
     EButtonMode mode = CLIENT_MODE;
     bool begun = false;
+    bool playing = false;
+    const MidiTrack *current_track = NULL;
 
     AttentionButton() {
         mx = new MATRIX7219(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
         mx_init();
-        draw_icon(SMILEY, mx);
+        draw_icon(SMILEY);
         Serial.begin(BAUD_RATE);
         while (!Serial);
+        Serial.print("\n[init] AttentionButton start...\n");
+    }
+
+    void draw_icon(IconId i) { ::draw_icon(i, mx); }
+
+    void server_setup(const String &scan_results) {
+        set_up_webserver(*server, scan_results, local_ip);
+        server->begin();
     }
 
     int setup_wifi(char *ssid, char *psk) {
         if (client_wifi_connected) return 1;
         WiFi.begin(ssid, psk);
-        loading_screen("...");
         int result = WiFi.waitForConnectResult();
         if (result != WL_CONNECTED) return 0;
         set_clock();
@@ -114,6 +124,8 @@ class AttentionButton {
         if (!client_wifi_connected && !setup_wifi(ssid, psk)) {
             fatal_error(CONNECTION_ERROR, mx);
         }
+
+        draw_icon(READY);
     }
 
     void mx_init() {
@@ -121,6 +133,7 @@ class AttentionButton {
         mx->clear();
         mx->setBrightness(3);
         mx->setSwap(1);
+        mx->setReverse(1);
     }
 
     void schedule_request() { should_post = true; }
@@ -131,7 +144,7 @@ class AttentionButton {
         last_req_time = now;
         should_post = 0;
         Serial.println("[client mode] requesting attention");
-        int status = hit_server(
+        int ok = hit_server(
             ROUTE("/request-attention"),
             [](HTTPClient &https, int code) { return code == 200; }, username,
             secret);
@@ -146,7 +159,7 @@ class AttentionButton {
     }
 
     void setup_iter() {
-        draw_icon(SETTINGS, mx);
+        draw_icon(SETTINGS);
         if (!was_ap_setup) {
             was_ap_setup = 1;
             start_soft_ap(CAPTIVE_SSID, CAPTIVE_PWD, local_ip, gateway_ip);
@@ -154,10 +167,17 @@ class AttentionButton {
             String scan_results = scan_wifi_networks();
             Serial.printf("[setup mode] scan results: %s\n",
                           scan_results.c_str());
-            set_up_webserver(*server, scan_results, local_ip);
-            server->begin();
+            server_setup(scan_results);
+
             return;
         }
-        dns->processNextRequest();
+        process_dns();
     }
+
+    void play_track(const char *name) {
+        playing = true;
+        current_track = &TRACK(track_idx(name));
+    }
+
+    void process_dns() { dns->processNextRequest(); }
 };
