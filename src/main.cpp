@@ -3,10 +3,23 @@
 #include "captive_portal_server.h"
 #include "constants.h"
 #include "utils.h"
+#include <Encoder.h>
+#include <EventEncoderButton.h>
+
+// Create an EventEncoderButton input
+EventEncoderButton enc(ENC_DAT, ENC_CLK,
+                       ENC_SW); // First two should be interrupt pins
+// Create a callback handler function
+void on_enc_input(InputEventType ev, EventEncoderButton &b) {
+    Serial.print("Encoder button event fired. Position is: ");
+    Serial.print(b.position());
+    Serial.print(" Pressed position is: ");
+    Serial.println(b.pressedPosition());
+}
+
+#define MQTT_HOST IPAddress(192, 168, 0, 104)
 
 AttentionButton *btn;
-
-void IRAM_ATTR attn_request() { btn->schedule_request(); }
 
 void setup() {
     for (auto &mode : pin_modes) {
@@ -20,14 +33,15 @@ void setup() {
         while (1);
     }
 
-    attachInterrupt(digitalPinToInterrupt(ENC_SW), attn_request, FALLING);
+    enc.setCallback(on_enc_input);
 }
 
 void loop() {
+    enc.update();
     unsigned long now = millis();
-    int bstate = !digitalRead(ENC_SW);
     if (now < 2000) {
-        if (bstate && !btn->begun && btn->mode != SETUP_MODE) {
+        if (enc.isPressed() && enc.currentDuration() > 500 && !btn->begun &&
+            btn->mode != SETUP_MODE) {
             btn->begin_setup_mode();
         }
     } else {
@@ -41,8 +55,7 @@ void loop() {
                 delay(DNS_INTERVAL);
                 break;
             case CLIENT_MODE:
-                btn->request_attention(now);
-                btn->poll(now);
+                btn->do_request(now);
                 break;
         }
     }
