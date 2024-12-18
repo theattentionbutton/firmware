@@ -142,7 +142,7 @@ class AttentionButton {
         last_req_time = now;
         should_post = 0;
         Serial.println("[client mode] requesting attention");
-        Serial.println("[todo] send mqtt req");
+        mqtt->publish(topic, "testing attn req");
     }
 
     void setup_iter() {
