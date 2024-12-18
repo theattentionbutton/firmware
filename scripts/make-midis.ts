@@ -10,7 +10,8 @@ if (!outputFile) throw new Error("No output file specified, bailing");
 
 const output = [
     '#include <Arduino.h>',
-    '#include <string.h>\n',
+    '#include <string.h>',
+    '#include "constants.h"\n',
     '#ifndef _MIDIS_H',
     '#define _MIDIS_H\n'
 ]
@@ -79,37 +80,37 @@ MidiTrackIdx track_idx(const char *name) {
 
 #define TRACK(x) tracks[x - 1]
 
-void error_beep(uint8_t bz) {
+void error_beep() {
     for (int i = 0; i < 3; i++) {
-        tone(bz, 544);
+        tone(BZ1, 544);
         delay(500);
-        noTone(bz);
+        noTone(BZ1);
         delay(150);
     }
 }
 
-void invalid_tone(uint8_t bz) {
+void invalid_tone() {
     for (int i = 0; i < 3; i++) {
         delay(350);
-        error_beep(D6);
+        error_beep();
     }
 }
 
-void play_track_by_idx(MidiTrackIdx id, uint8_t bz) {
-    if (!id) return invalid_tone(bz);
+void play_track_by_idx(MidiTrackIdx id) {
+    if (!id) return invalid_tone();
 
     MidiTrack t = TRACK(id);
     for (int i = 0; i < t.length; i++) {
         int *note = t.first[i];
         delay(note[2]);
-        tone(bz, note[0]);
+        tone(BZ1, note[0]);
         delay((unsigned long)note[1] + 10);
-        noTone(bz);
+        noTone(BZ1);
     }
 }
 
-void play_track_by_name(const char *name, uint8_t bz) {
-    play_track_by_idx(track_idx(name), bz);
+void play_track_by_name(const char *name) {
+    play_track_by_idx(track_idx(name));
 }\n`,
     '#endif\n'
 ])
