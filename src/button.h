@@ -44,13 +44,17 @@ class AttentionButton {
     AttentionButton() {
         mx = new MATRIX7219(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
         mx_init();
-        draw_icon(SMILEY);
+        draw_icon("SMILEY");
         Serial.begin(BAUD_RATE);
         while (!Serial);
         Serial.print("\n[init] AttentionButton start...\n");
     }
 
-    void draw_icon(IconId i) { ::draw_icon(i, mx); }
+    void draw_icon(const char *name) {
+        int idx = icon_idx(name);
+        IconId i = (idx != 0) ? (IconId)idx : EXCLAMATION;
+        ::draw_icon(i, mx);
+    }
 
     void server_setup(const String &scan_results) {
         set_up_webserver(*server, scan_results, local_ip);
@@ -119,8 +123,7 @@ class AttentionButton {
             fatal_error(CONNECTION_ERROR, mx);
         }
 
-        mqtt_connect();
-        draw_icon(READY);
+        draw_icon("READY");
     }
 
     void mx_init() {
@@ -143,7 +146,7 @@ class AttentionButton {
     }
 
     void setup_iter() {
-        draw_icon(SETTINGS);
+        draw_icon("SETTINGS");
         if (!was_ap_setup) {
             was_ap_setup = 1;
             start_soft_ap(CAPTIVE_SSID, CAPTIVE_PWD, local_ip, gateway_ip);
