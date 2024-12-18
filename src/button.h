@@ -6,6 +6,7 @@
 #include "littlefs_kv.h"
 #include "midis.h"
 #include "utils.h"
+#include <Crypto.h>
 #include <DNSServer.h>
 #include <ESP8266MQTTClient.h>
 #include <MATRIX7219.h>
@@ -15,6 +16,16 @@ X509List root_ca_x509(ROOT_CA_CERT);
 
 #define FETCH(variable, max_len, yes, no)                                      \
     kv_get(#variable, variable, max_len) ? yes : no
+
+String sha256_to_hex(const uint8_t *hash) {
+    const char *hex = "0123456789abcdef";
+    char buf[64] = {0};
+    for (int i = 0; i < 32; i++) {
+        buf[2 * i] = hex[hash[i] >> 4];
+        buf[2 * i + 1] = hex[hash[i] & 0xf];
+    }
+    return String(buf);
+}
 
 class AttentionButton {
     MATRIX7219 *mx;
@@ -30,6 +41,7 @@ class AttentionButton {
     char psk[64] = {0};
     char secret[64] = {0};
     char username[255] = {0};
+    char topic[128] = {0};
 
   public:
     DNSServer *dns;
@@ -58,7 +70,7 @@ class AttentionButton {
         server->begin();
     }
 
-    void mqtt_connect() {
+    void mqtt_connect(const char *topic) {
         if (!mqtt) mqtt = new MQTTClient();
         mqtt->onSecure([](WiFiClientSecure *client, String host) {
             Serial.printf("Secure: %s\r\n", host.c_str());
@@ -66,21 +78,21 @@ class AttentionButton {
             return client;
         });
 
-        mqtt->onData([this](String topic, String data, bool cont) {
+        mqtt->onData([this](String t, String data, bool cont) {
 
         });
 
-        mqtt->onSubscribe([this](int sub_id) {
+        mqtt->onSubscribe([this, topic](int sub_id) {
             Serial.printf("Subscribe topic id: %d ok\r\n", sub_id);
-            mqtt->publish("/attentionbutton/testing", "qos0", 0, 0);
+            mqtt->publish(topic, "qos0", 0, 0);
         });
 
-        mqtt->onConnect([this]() {
+        mqtt->onConnect([this, topic]() {
             Serial.printf("MQTT: Connected\r\n");
-            mqtt->subscribe("/attentionbutton/testing", 0);
+            mqtt->subscribe(topic, 0);
         });
 
-        mqtt->begin("mqtts://mqtt-dashboard.com:8883");
+        mqtt->begin("mqtts://" MQTT_BROKER ":" MQTT_PORT);
     }
 
     int setup_wifi(char *ssid, char *psk) {
@@ -89,7 +101,6 @@ class AttentionButton {
         int result = WiFi.waitForConnectResult();
         if (result != WL_CONNECTED) return 0;
         set_clock();
-        mqtt_connect();
         return client_wifi_connected = 1;
     }
 
@@ -121,6 +132,19 @@ class AttentionButton {
             fatal_error(CONNECTION_ERROR, mx);
         }
 
+        SHA256 hasher;
+        hasher.doUpdate(secret);
+        uint8_t hash[SHA256_SIZE];
+        hasher.doFinal(hash);
+        String s = sha256_to_hex(hash);
+
+        char buf[128] = {0};
+
+        snprintf(buf, sizeof(buf), "attnbtn/messages/%.*s", 64, s.c_str());
+
+        Serial.printf("[debug] topic id %s\n", buf);
+        strncpy(topic, buf, 127);
+        mqtt_connect(buf);
         draw_icon("READY");
     }
 
