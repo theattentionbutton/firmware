@@ -1,58 +1,27 @@
+#include "captive_portal.h"
 #include "captive_portal_server.h"
 #include "cert.h"
 #include "constants.h"
 #include "depends/ESPAsyncWebSrv.h"
 #include "littlefs_kv.h"
+#include "midis.h"
 #include "utils.h"
 #include <DNSServer.h>
-#include <ESP8266HTTPClient.h>
+#include <ESP8266MQTTClient.h>
 #include <MATRIX7219.h>
 #include <WiFiClientSecure.h>
-#define NetworkClientSecure WiFiClientSecure
-X509List root_ca_x509(ROOT_CA_CERT);
 
-#include "captive_portal.h"
-#include "midis.h"
+const char fingerprint[] =
+    "5E D1 8B 32 7C BA EC A0 AB 29 7A 3A 45 C2 2F 79 1C 6F 4B BC";
+
+X509List root_ca_x509(ROOT_CA_CERT);
 
 #define FETCH(variable, max_len, yes, no)                                      \
     kv_get(#variable, variable, max_len) ? yes : no
 
-template <typename ResponseHandler>
-int hit_server(const char *route, ResponseHandler handler, const char *username,
-               const char *secret) {
-    NetworkClientSecure *client = new NetworkClientSecure();
-    int id = 0;
-    if (!client) return id;
-    client->setTrustAnchors(&root_ca_x509);
-    {
-        HTTPClient https;
-        if (!https.begin(*client, route)) goto cleanup;
-        char body[512] = {0};
-        snprintf(body, 512 - 1, R"({"secret":"%63s", "username": "%254s"})",
-                 secret, username);
-        int code = https.POST(body);
-
-        Serial.printf("server responded with %d\n", code);
-        id = handler(https, code);
-    }
-
-cleanup:
-    delete client;
-    return id;
-}
-
-int response_action(HTTPClient &https, int code) {
-    if (code != 200) return 0;
-    String response = https.getString();
-    JsonDocument doc;
-    deserializeJson(doc, response);
-    if (!doc["icon_id"].is<int>()) return 0;
-    int id = doc["icon_id"];
-    return id;
-}
-
 class AttentionButton {
     MATRIX7219 *mx;
+    MQTTClient *mqtt = NULL;
     AsyncWebServer *server;
     unsigned long last_button_press = 0;
     unsigned long last_poll_time = 0;
@@ -88,12 +57,37 @@ class AttentionButton {
         server->begin();
     }
 
+    void mqtt_connect() {
+        if (!mqtt) mqtt = new MQTTClient();
+        mqtt->onSecure([](WiFiClientSecure *client, String host) {
+            Serial.printf("Secure: %s\r\n", host.c_str());
+            return client->setFingerprint(fingerprint);
+        });
+
+        mqtt->onData([this](String topic, String data, bool cont) {
+
+        });
+
+        mqtt->onSubscribe([this](int sub_id) {
+            Serial.printf("Subscribe topic id: %d ok\r\n", sub_id);
+            mqtt->publish("/attentionbutton/testing", "qos0", 0, 0);
+        });
+
+        mqtt->onConnect([this]() {
+            Serial.printf("MQTT: Connected\r\n");
+            mqtt->subscribe("/attentionbutton/testing", 0);
+        });
+
+        mqtt->begin("mqtts://mqtt-dashboard.com:8883");
+    }
+
     int setup_wifi(char *ssid, char *psk) {
         if (client_wifi_connected) return 1;
         WiFi.begin(ssid, psk);
         int result = WiFi.waitForConnectResult();
         if (result != WL_CONNECTED) return 0;
         set_clock();
+        mqtt_connect();
         return client_wifi_connected = 1;
     }
 
@@ -125,6 +119,7 @@ class AttentionButton {
             fatal_error(CONNECTION_ERROR, mx);
         }
 
+        mqtt_connect();
         draw_icon(READY);
     }
 
@@ -138,24 +133,13 @@ class AttentionButton {
 
     void schedule_request() { should_post = true; }
 
-    void request_attention(unsigned long now) {
+    void do_request(unsigned long now) {
         if (!should_post || (now - last_req_time) < MIN_ATTENTION_INTERVAL)
             return;
         last_req_time = now;
         should_post = 0;
         Serial.println("[client mode] requesting attention");
-        int ok = hit_server(
-            ROUTE("/request-attention"),
-            [](HTTPClient &https, int code) { return code == 200; }, username,
-            secret);
-    }
-
-    void poll(unsigned long now) {
-        if (now - last_poll_time < POLL_DELAY) return;
-        last_poll_time = now;
-        Serial.println("[client mode] querying for messages");
-        int icon = hit_server(ROUTE("/list-messages"), response_action,
-                              username, secret);
+        Serial.println("[todo] send mqtt req");
     }
 
     void setup_iter() {
@@ -177,4 +161,6 @@ class AttentionButton {
     void play_track(const char *name) { play_track_by_name(name); }
 
     void process_dns() { dns->processNextRequest(); }
+
+    void handle_mqtt() { mqtt->handle(); }
 };

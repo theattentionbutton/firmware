@@ -56,6 +56,7 @@ void loop() {
                 break;
             case CLIENT_MODE:
                 btn->do_request(now);
+                btn->handle_mqtt();
                 break;
         }
     }
