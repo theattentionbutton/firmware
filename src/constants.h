@@ -3,6 +3,9 @@
 #ifndef __CONSTANTS_H
 #define __CONSTANTS_H
 
+#define MQTT_BROKER "mqtt-dashboard.com"
+#define MQTT_PORT "8883"
+
 #define MATRIX_CNT 1 // matrix count
 
 #define ENC_DAT 14
