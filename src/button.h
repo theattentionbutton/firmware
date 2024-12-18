@@ -174,10 +174,7 @@ class AttentionButton {
         process_dns();
     }
 
-    void play_track(const char *name) {
-        playing = true;
-        current_track = &TRACK(track_idx(name));
-    }
+    void play_track(const char *name) { play_track_by_name(name); }
 
     void process_dns() { dns->processNextRequest(); }
 };

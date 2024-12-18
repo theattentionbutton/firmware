@@ -15,4 +15,10 @@ make
 
 ## TODO:
 
-- kick back into setup mode when credentials not set
+- icon ideas
+  - pill
+  - cup of coffee
+  - phone
+  - cat bunny etc
+  - flower
+  - lollipop
