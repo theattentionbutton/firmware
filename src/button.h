@@ -31,11 +31,9 @@ class AttentionButton {
     MATRIX7219 *mx;
     MQTTClient *mqtt = NULL;
     AsyncWebServer *server;
-    unsigned long last_button_press = 0;
-    unsigned long last_poll_time = 0;
     unsigned long last_req_time = 0;
     bool was_ap_setup = false;
-    bool should_post = false;
+    bool request_pending = false;
     bool client_wifi_connected = false;
     char ssid[64] = {0};
     char psk[64] = {0};
@@ -156,13 +154,13 @@ class AttentionButton {
         mx->setReverse(1);
     }
 
-    void schedule_request() { should_post = true; }
+    void schedule_request() { request_pending = true; }
 
     void do_request(unsigned long now) {
-        if (!should_post || (now - last_req_time) < MIN_ATTENTION_INTERVAL)
+        if (!request_pending || (now - last_req_time) < MIN_ATTENTION_INTERVAL)
             return;
         last_req_time = now;
-        should_post = 0;
+        request_pending = 0;
         Serial.println("[client mode] requesting attention");
         mqtt->publish(topic, "testing attn req");
     }
