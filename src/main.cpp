@@ -5,21 +5,27 @@
 #include "utils.h"
 #include <Encoder.h>
 #include <EventEncoderButton.h>
+#include <EventInputBase.h>
+
+AttentionButton *btn;
 
 // Create an EventEncoderButton input
 EventEncoderButton enc(ENC_DAT, ENC_CLK,
                        ENC_SW); // First two should be interrupt pins
 // Create a callback handler function
 void on_enc_input(InputEventType ev, EventEncoderButton &b) {
-    Serial.print("Encoder button event fired. Position is: ");
-    Serial.print(b.position());
-    Serial.print(" Pressed position is: ");
-    Serial.println(b.pressedPosition());
+    switch (ev) {
+        case InputEventType::CLICKED:
+            btn->schedule_request();
+            break;
+        case InputEventType::CHANGED:
+            Serial.println(b.position());
+        default:
+            break;
+    }
 }
 
 #define MQTT_HOST IPAddress(192, 168, 0, 104)
-
-AttentionButton *btn;
 
 void setup() {
     for (auto &mode : pin_modes) {
