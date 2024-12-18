@@ -77,7 +77,8 @@ String scan_wifi_networks() {
     JsonDocument doc;
     JsonArray results = doc["scan_results"].to<JsonArray>();
     int n = WiFi.scanNetworks();
-    for (uint8_t i = 0; i < 255; i++) {
+    // cap networks to 20 even if found
+    for (uint8_t i = 0; i < 20 && i < n; i++) {
         JsonObject result = results.add<JsonObject>();
         result["rssi"] = WiFi.RSSI(i);
         result["ssid"] = WiFi.SSID(i);
