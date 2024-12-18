@@ -1,9 +1,9 @@
 #include "FS.h"
 #include "captive_portal.h"
 #include "captive_portal_index.h"
+#include "depends/ESPAsyncWebSrv.h"
 #include "littlefs_kv.h"
 #include "utils.h"
-#include <ESPAsyncWebSrv.h>
 #include <flash_hal.h>
 
 #ifndef __CAPTIVE_PORTAL_SERVER
@@ -154,9 +154,7 @@ void set_up_webserver(AsyncWebServer &server, const String &scanResults,
     }); // windows 11 captive portal workaround
 
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response =
-            request->beginResponse(200, "text/html", index_html);
-        request->send(response);
+        request->send_P(200, "text/html", index_html);
     });
 
     server.on("/scan", HTTP_ANY, [scanResults](AsyncWebServerRequest *request) {
