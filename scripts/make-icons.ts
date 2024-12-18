@@ -57,12 +57,12 @@ output.push(
     }),
     '} IconId;',
     '',
-    'const char ICON_NAMES[][20] PROGMEM = {',
+    'const char ICON_NAMES[][20] = {',
     '    "",', // Invalid entry
     '    ' + Object.keys(icons).map(key => `"${key}"`).join(',\n    '),
     '};',
     '',
-    'const IconId DRAWABLE_ICONS[] PROGMEM = {',
+    'const IconId DRAWABLE_ICONS[] = {',
     ...drawables.map((drawable, idx) => {
         const delimiter = idx === drawables.length - 1 ? "" : ",";
         return `    ${drawable}${delimiter}`;

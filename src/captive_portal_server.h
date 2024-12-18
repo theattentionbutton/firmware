@@ -51,7 +51,7 @@ void handle_ru_route(AsyncWebServerRequest *request, const char *param,
     return respond(200, resp);
 }
 
-char routes_to_local_ip[][32] PROGMEM = {
+char routes_to_local_ip[][32] = {
     "/generate_204",        // android captive portal redirect
     "/redirect",            // microsoft redirect
     "/hotspot-detect.html", // apple call home
@@ -60,7 +60,7 @@ char routes_to_local_ip[][32] PROGMEM = {
     "/startpage"            // general redirect
 };
 
-char routes_200[][32] PROGMEM = {
+char routes_200[][32] = {
     "/success.txt",            // firefox captive portal call home
     "/chrome-variations/seed", // chrome captive portal call home
     "/service/update2/json"    // firefox?
