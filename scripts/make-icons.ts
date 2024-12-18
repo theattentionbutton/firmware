@@ -7,13 +7,23 @@ const iconsDir = join(d, 'icons');
 const outputFile = Deno.args[1];
 if (!outputFile) throw new Error("No output file specified, bailing");
 
+const output = [
+    '#include <pgmspace.h>',
+    '#include <string.h>',
+    '',
+    '#ifndef __ICON_H',
+    '#define __ICON_H',
+    '',
+    'typedef enum icon_id_t {',
+];
+
 const icons: Record<string, number[]> = {};
 const drawables: string[] = [];
 
 for await (const file of Deno.readDir(iconsDir)) {
     if (!file.isFile || !file.name.toLowerCase().endsWith('png')) continue;
     const bytes = await Deno.readFile(join(d, 'icons', file.name));
-    const cleaned = file.name.replace(/^D_/, "").replace(/\.png$/, '');
+    const cleaned = file.name.replace(/^D_/, "").replace(/\.png$/, '').toUpperCase();
     if (file.name.startsWith("D_")) {
         drawables.push(cleaned);
     }
@@ -39,19 +49,18 @@ for await (const file of Deno.readDir(iconsDir)) {
     icons[cleaned] = arr;
 }
 
-const output = [
-    '#include <pgmspace.h>',
-    '',
-    '#ifndef __ICON_H',
-    '#define __ICON_H',
-    '',
-    'typedef enum icon_id_t {',
+output.push(
     ...Object.keys(icons).map((key, idx) => {
         const suffix = idx === 0 ? " = 1" : "";
         const delimiter = idx === Object.keys(icons).length - 1 ? "" : ",";
         return `    ${key}${suffix}${delimiter}`;
     }),
     '} IconId;',
+    '',
+    'const char ICON_NAMES[][20] PROGMEM = {',
+    '    "",', // Invalid entry
+    '    ' + Object.keys(icons).map(key => `"${key}"`).join(',\n    '),
+    '};',
     '',
     'const int DRAWABLE_ICONS[] PROGMEM = {',
     ...drawables.map((drawable, idx) => {
@@ -72,7 +81,22 @@ const output = [
     '#define ICONS_LENGTH (sizeof(ICONS)/sizeof(ICONS[0]))',
     '#define ICON(id) ICONS[id - 1]',
     '',
+    `int icon_idx(const char *name) {`,
+    '    for (int i = 1; i <= ICONS_LENGTH; i++) {',
+    '        if (strcmp_P(name, ICON_NAMES[i]) == 0) {',
+    '            return i;',
+    '        }',
+    '    }',
+    '    return 0;',
+    '}',
+    '',
+    'const byte* get_icon_by_name(const char *name) {',
+    '    int idx = icon_idx(name);',
+    '    if (idx == 0) return ICON(EXCLAMATION);',
+    '    return ICON(idx);',
+    '}',
+    '',
     '#endif'
-];
+);
 
 await Deno.writeTextFile(outputFile, output.join('\n'));
