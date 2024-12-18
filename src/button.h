@@ -11,9 +11,6 @@
 #include <MATRIX7219.h>
 #include <WiFiClientSecure.h>
 
-const char fingerprint[] =
-    "5E D1 8B 32 7C BA EC A0 AB 29 7A 3A 45 C2 2F 79 1C 6F 4B BC";
-
 X509List root_ca_x509(ROOT_CA_CERT);
 
 #define FETCH(variable, max_len, yes, no)                                      \
@@ -65,7 +62,8 @@ class AttentionButton {
         if (!mqtt) mqtt = new MQTTClient();
         mqtt->onSecure([](WiFiClientSecure *client, String host) {
             Serial.printf("Secure: %s\r\n", host.c_str());
-            return client->setFingerprint(fingerprint);
+            client->setTrustAnchors(&root_ca_x509);
+            return client;
         });
 
         mqtt->onData([this](String topic, String data, bool cont) {
