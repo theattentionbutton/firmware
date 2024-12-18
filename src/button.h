@@ -12,7 +12,8 @@
 #include <MATRIX7219.h>
 #include <WiFiClientSecure.h>
 
-X509List root_ca_x509(ROOT_CA_CERT);
+const char fingerprint[] =
+    "5E D1 8B 32 7C BA EC A0 AB 29 7A 3A 45 C2 2F 79 1C 6F 4B BC";
 
 #define FETCH(variable, max_len, yes, no)                                      \
     kv_get(#variable, variable, max_len) ? yes : no
@@ -32,6 +33,7 @@ class AttentionButton {
     MQTTClient *mqtt = NULL;
     AsyncWebServer *server;
     unsigned long last_req_time = 0;
+    unsigned long last_message = 0;
     bool was_ap_setup = false;
     bool request_pending = false;
     bool client_wifi_connected = false;
@@ -39,6 +41,7 @@ class AttentionButton {
     char psk[64] = {0};
     char secret[64] = {0};
     char username[255] = {0};
+    char ringtone[17] = "JUNE";
     char topic[128] = {0};
 
   public:
@@ -63,32 +66,49 @@ class AttentionButton {
         ::draw_icon(i, mx);
     }
 
+    void draw_icon_by_id(IconId i) { ::draw_icon(i, mx); }
+
     void server_setup(const String &scan_results) {
         set_up_webserver(*server, scan_results, local_ip);
         server->begin();
     }
 
+    void message_received(const char *icon_name) {
+        last_message = millis();
+        for (int i = 0; i < 3; i++) {
+            mx->displayTest(true);
+            delay(500);
+            mx->displayOff();
+            delay(500);
+        }
+        draw_icon(icon_name);
+        play_track(ringtone);
+    }
+
     void mqtt_connect(const char *topic) {
         if (!mqtt) mqtt = new MQTTClient();
+
         mqtt->onSecure([](WiFiClientSecure *client, String host) {
             Serial.printf("Secure: %s\r\n", host.c_str());
-            client->setTrustAnchors(&root_ca_x509);
-            return client;
+            return client->setFingerprint(fingerprint);
         });
 
         mqtt->onData([this](String t, String data, bool cont) {
-
+            Serial.println("Received MQTT data: ");
+            Serial.printf("topic: %s\ndata: %s\n", t.c_str(), data.c_str());
         });
 
         mqtt->onSubscribe([this, topic](int sub_id) {
             Serial.printf("Subscribe topic id: %d ok\r\n", sub_id);
-            mqtt->publish(topic, "qos0", 0, 0);
         });
 
         mqtt->onConnect([this, topic]() {
             Serial.printf("MQTT: Connected\r\n");
             mqtt->subscribe(topic, 0);
         });
+
+        mqtt->onDisconnect(
+            [this, topic]() { Serial.println("MQTT disconnected"); });
 
         mqtt->begin("mqtts://" MQTT_BROKER ":" MQTT_PORT);
     }
@@ -130,6 +150,10 @@ class AttentionButton {
             fatal_error(CONNECTION_ERROR, mx);
         }
 
+        char ringtone_buf[17];
+        int len = kv_get("ringtone", ringtone_buf, 16);
+        if (len) strncpy(ringtone, ringtone_buf, 16);
+
         SHA256 hasher;
         hasher.doUpdate(secret);
         uint8_t hash[SHA256_SIZE];
@@ -140,7 +164,7 @@ class AttentionButton {
 
         snprintf(buf, sizeof(buf), "attnbtn/messages/%.*s", 64, s.c_str());
 
-        Serial.printf("[debug] topic id %s\n", buf);
+        Serial.printf("[debug] topic id \"%s\"\n", buf);
         strncpy(topic, buf, 127);
         mqtt_connect(buf);
         draw_icon("READY");
