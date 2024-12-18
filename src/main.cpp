@@ -53,6 +53,7 @@ void setup() {
     }
 
     enc.setCallback(on_enc_input);
+    enc.setPositionDivider(2);
 }
 
 void loop() {
