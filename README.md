@@ -15,10 +15,4 @@ make
 
 ## TODO:
 
-- icon ideas
-  - pill
-  - cup of coffee
-  - phone
-  - cat bunny etc
-  - flower
-  - lollipop
+- reconnect mqtt and wifi on disconnect
