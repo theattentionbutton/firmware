@@ -78,7 +78,7 @@ class AttentionButton {
     AttentionButton() {
         mx = new MATRIX7219(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
         mx_init();
-        draw_icon("SMILEY");
+        draw_icon("LOADING");
         Serial.begin(BAUD_RATE);
         while (!Serial);
         Serial.print("\n[init] AttentionButton start...\n");
