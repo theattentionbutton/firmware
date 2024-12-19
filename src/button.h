@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "littlefs_kv.h"
 #include "midis.h"
+#include "parse_payload_string.h"
 #include "utils.h"
 #include <Crypto.h>
 #include <DNSServer.h>
@@ -28,20 +29,36 @@ String sha256_to_hex(const uint8_t *hash) {
     return String(buf);
 }
 
+typedef enum display_event_type_t {
+    NONE = 0,
+    ENC_INPUT,
+    MESSAGE
+} DisplayEventType;
+
+int disp_event_delay(DisplayEventType t) {
+    switch (t) {
+        case ENC_INPUT:
+            return 5000;
+        case MESSAGE:
+            return 30000;
+    }
+
+    return 0;
+}
+
 class AttentionButton {
     MATRIX7219 *mx;
-    MQTTClient *mqtt = NULL;
+    MQTTClient mqtt;
     AsyncWebServer *server;
     unsigned long last_req_time = 0;
-    unsigned long last_message = 0;
     bool was_ap_setup = false;
     bool request_pending = false;
     bool client_wifi_connected = false;
     char ssid[64] = {0};
     char psk[64] = {0};
     char secret[64] = {0};
-    char username[255] = {0};
-    char ringtone[17] = "JUNE";
+    char username[256] = {0};
+    char ringtone[20] = "JUNE";
     char topic[128] = {0};
 
   public:
@@ -49,6 +66,13 @@ class AttentionButton {
     EButtonMode mode = CLIENT_MODE;
     bool begun = false;
     bool playing = false;
+    bool disp_was_reset = true;
+    unsigned long last_disp_event_time = 0;
+    DisplayEventType last_disp_event_type = NONE;
+    bool has_selected_icon = false;
+    IconId current_selected_icon = EXCLAMATION;
+
+    unsigned long last_message = 0;
     const MidiTrack *current_track = NULL;
 
     AttentionButton() {
@@ -73,44 +97,61 @@ class AttentionButton {
         server->begin();
     }
 
+    void mx_set_all(bool on = true) {
+        for (int i = 0; i < 8; i++) {
+            mx->setRow(i + 1, on ? 255 : 0, 0);
+        }
+    }
+
     void message_received(const char *icon_name) {
         last_message = millis();
         for (int i = 0; i < 3; i++) {
-            mx->displayTest(true);
-            delay(500);
-            mx->displayOff();
-            delay(500);
+            mx_set_all();
+            delay(400);
+            mx_set_all(false);
+            delay(400);
         }
         draw_icon(icon_name);
         play_track(ringtone);
+        disp_was_reset = false;
+        last_disp_event_type = MESSAGE;
+        last_disp_event_time = millis();
     }
 
     void mqtt_connect(const char *topic) {
-        if (!mqtt) mqtt = new MQTTClient();
-
-        mqtt->onSecure([](WiFiClientSecure *client, String host) {
+        String t(topic);
+        mqtt.onSecure([](WiFiClientSecure *client, String host) {
             Serial.printf("Secure: %s\r\n", host.c_str());
             return client->setFingerprint(fingerprint);
         });
 
-        mqtt->onData([this](String t, String data, bool cont) {
-            Serial.println("Received MQTT data: ");
-            Serial.printf("topic: %s\ndata: %s\n", t.c_str(), data.c_str());
+        mqtt.onData([this](String topic, String data, bool cont) {
+            char icon[32];
+            char email[255];
+            int result = parse_payload(data, icon, email);
+            if (result == ERROR_TOO_LONG || result == ERROR_INVALID_FORMAT) {
+                return;
+            }
+            if (strcmp(email, username) == 0) {
+                Serial.println("[debug] got own message");
+            } else {
+                Serial.printf("[debug] iconid: %s, email: %s\n", icon, email);
+                message_received(icon);
+            }
         });
 
-        mqtt->onSubscribe([this, topic](int sub_id) {
-            Serial.printf("Subscribe topic id: %d ok\r\n", sub_id);
+        mqtt.onSubscribe([this, t](int sub_id) {
+            Serial.printf("[mqtt] Subscribe topic id: %d ok\r\n", sub_id);
+            mqtt.publish(t, "qos0", 0, 0);
         });
 
-        mqtt->onConnect([this, topic]() {
-            Serial.printf("MQTT: Connected\r\n");
-            mqtt->subscribe(topic, 0);
+        mqtt.onConnect([this, t]() {
+            Serial.printf("[mqtt] connected to broker\r\n");
+            mqtt.subscribe(t, 0);
+            draw_icon("READY");
         });
 
-        mqtt->onDisconnect(
-            [this, topic]() { Serial.println("MQTT disconnected"); });
-
-        mqtt->begin("mqtts://" MQTT_BROKER ":" MQTT_PORT);
+        mqtt.begin("mqtts://" MQTT_BROKER ":" MQTT_PORT);
     }
 
     int setup_wifi(char *ssid, char *psk) {
@@ -150,7 +191,7 @@ class AttentionButton {
             fatal_error(CONNECTION_ERROR, mx);
         }
 
-        char ringtone_buf[17];
+        char ringtone_buf[20] = {0};
         int len = kv_get("ringtone", ringtone_buf, 16);
         if (len) strncpy(ringtone, ringtone_buf, 16);
 
@@ -167,7 +208,6 @@ class AttentionButton {
         Serial.printf("[debug] topic id \"%s\"\n", buf);
         strncpy(topic, buf, 127);
         mqtt_connect(buf);
-        draw_icon("READY");
     }
 
     void mx_init() {
@@ -178,15 +218,22 @@ class AttentionButton {
         mx->setReverse(1);
     }
 
-    void schedule_request() { request_pending = true; }
+    void schedule_request() {
+        if (has_selected_icon) request_pending = true;
+    }
 
     void do_request(unsigned long now) {
         if (!request_pending || (now - last_req_time) < MIN_ATTENTION_INTERVAL)
             return;
+        if (!has_selected_icon) return;
         last_req_time = now;
         request_pending = 0;
         Serial.println("[client mode] requesting attention");
-        mqtt->publish(topic, "testing attn req");
+        char buf[512] = {0};
+        snprintf(buf, 512, "#%.*s#%.*s#", 20, icon_name(current_selected_icon),
+                 254, username);
+        Serial.printf("[debug] %s\n", buf);
+        mqtt.publish(topic, buf);
     }
 
     void setup_iter() {
@@ -209,5 +256,5 @@ class AttentionButton {
 
     void process_dns() { dns->processNextRequest(); }
 
-    void handle_mqtt() { mqtt->handle(); }
+    void handle_mqtt() { mqtt.handle(); }
 };
