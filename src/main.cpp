@@ -14,16 +14,15 @@ EventEncoderButton enc(ENC_DAT, ENC_CLK,
                        ENC_SW); // First two should be interrupt pins
 
 int icon_id = 0;
-unsigned long pos_change = 0;
-bool disp_was_reset = true;
 void on_enc_input(InputEventType ev, EventEncoderButton &b) {
     switch (ev) {
         case InputEventType::CLICKED:
             btn->schedule_request();
             break;
         case InputEventType::CHANGED: {
-            pos_change = millis();
-            disp_was_reset = false;
+            btn->last_disp_event_type = ENC_INPUT;
+            btn->last_disp_event_time = millis();
+            btn->disp_was_reset = false;
             int pos = b.position() % DRAWABLE_LENGTH;
             int counter = 0;
             for (int i = 0; i < DRAWABLE_LENGTH; i++) {
@@ -31,14 +30,15 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
                 counter += 1;
             }
             btn->draw_icon_by_id(DRAWABLE_ICONS[counter]);
+            btn->current_selected_icon = DRAWABLE_ICONS[counter];
+            btn->has_selected_icon = true;
+            const char *name = icon_name(DRAWABLE_ICONS[counter]);
             break;
         }
         default:
             break;
     }
 }
-
-#define MQTT_HOST IPAddress(192, 168, 0, 104)
 
 void setup() {
     for (auto &mode : pin_modes) {
@@ -68,11 +68,14 @@ void loop() {
         if (!btn->begun) btn->begin_client_mode();
     }
 
-    if (now - pos_change > 3000 && !disp_was_reset) {
+    if (now - btn->last_disp_event_time >
+            disp_event_delay(btn->last_disp_event_type) &&
+        !btn->disp_was_reset) {
         Serial.printf("[loop] Time since last event: %lu - resetting display\n",
-                      now - pos_change);
+                      now - btn->last_disp_event_type);
         btn->draw_icon("READY");
-        disp_was_reset = true;
+        btn->disp_was_reset = true;
+        btn->has_selected_icon = false;
     }
 
     if (btn->begun) {
