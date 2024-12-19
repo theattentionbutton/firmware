@@ -96,6 +96,13 @@ output.push(
     '    return ICON(idx);',
     '}',
     '',
+    'const char * icon_name(IconId id) {',
+    '    for (int i = 0; i < ICONS_LENGTH; i++) {',
+    '        if (i + 1 == id) return ICON_NAMES[i];',
+    '    }',
+    '    return NULL;',
+    '}',
+    '',
     '#endif'
 );
 
