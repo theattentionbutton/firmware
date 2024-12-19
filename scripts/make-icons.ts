@@ -98,7 +98,7 @@ output.push(
     '',
     'const char * icon_name(IconId id) {',
     '    for (int i = 0; i < ICONS_LENGTH; i++) {',
-    '        if (i + 1 == id) return ICON_NAMES[i];',
+    '        if (i + 1 == id) return ICON_NAMES[i + 1];',
     '    }',
     '    return NULL;',
     '}',
