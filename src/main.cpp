@@ -2,6 +2,7 @@
 #include "captive_portal.h"
 #include "captive_portal_server.h"
 #include "constants.h"
+#include "icons.h"
 #include "utils.h"
 #include <Encoder.h>
 #include <EventEncoderButton.h>
@@ -13,31 +14,86 @@ AttentionButton *btn;
 EventEncoderButton enc(ENC_DAT, ENC_CLK,
                        ENC_SW); // First two should be interrupt pins
 
+IconId extras_icons[] = {RINGTONE};
+
 int icon_id = 0;
 void on_enc_input(InputEventType ev, EventEncoderButton &b) {
     switch (ev) {
         case InputEventType::CLICKED:
-            btn->schedule_request();
+            switch (btn->menu_mode) {
+                case MAIN_MENU: {
+                    btn->schedule_request();
+                    break;
+                }
+                case RINGTONE_SELECT: {
+                    kv_put("ringtone", TRACK_NAMES[btn->ringtone_idx]);
+                    play_track_by_name("SUCCESS");
+                    break;
+                }
+                case EXTRAS: {
+                    if (btn->extras_idx == 0) {
+                        btn->menu_mode = RINGTONE_SELECT;
+                        btn->mx_clear();
+                        btn->ringtone_idx = 0;
+                    }
+                    break;
+                }
+            }
             break;
         case InputEventType::CHANGED: {
-            btn->display_updated(ENC_INPUT, millis());
-            int pos = b.position() % DRAWABLE_LENGTH;
-            int counter = 0;
-            for (int i = 0; i < DRAWABLE_LENGTH; i++) {
-                if (pos == counter) break;
-                counter += 1;
-            }
-            IconId id = DRAWABLE_ICONS[counter];
-            btn->draw_icon_by_id(id);
-            btn->set_selected_icon(id);
+            switch (btn->menu_mode) {
+                case MAIN_MENU: {
+                    btn->display_updated(ENC_INPUT, millis());
+                    int pos = abs(b.position()) % DRAWABLE_LENGTH;
+                    int counter = 0;
+                    for (int i = 0; i < DRAWABLE_LENGTH; i++) {
+                        if (pos == counter) break;
+                        counter += 1;
+                    }
+                    IconId id = DRAWABLE_ICONS[counter];
+                    btn->draw_icon_by_id(id);
+                    btn->set_selected_icon(id);
 
-            const char *name = icon_name(id);
-            Serial.printf("[debug] selected icon %s\n", name);
+                    const char *name = icon_name(id);
+                    Serial.printf("[debug] selected icon %s\n", name);
+                    break;
+                }
+
+                case RINGTONE_SELECT: {
+                    int pos = abs(b.position()) % TRACK_COUNT;
+                    btn->draw_number(pos);
+                    if (pos) {
+                        play_track_by_idx((MidiTrackIdx)pos, &enc);
+                        btn->ringtone_idx = pos;
+                    }
+                    break;
+                }
+
+                case EXTRAS: {
+                    break;
+                }
+            }
             break;
         }
         case InputEventType::LONG_CLICKED:
             Serial.println("[debug] long press");
-            play_track_by_idx(SOMETHINGS, &enc);
+            switch (btn->menu_mode) {
+                case RINGTONE_SELECT:
+                case MAIN_MENU: {
+                    btn->menu_mode = EXTRAS;
+                    btn->draw_icon_by_id(extras_icons[0]);
+                    btn->extras_idx = 0;
+                    break;
+                }
+                case EXTRAS: {
+                    btn->menu_mode = MAIN_MENU;
+                    btn->draw_icon("READY");
+                    break;
+                }
+            }
+            break;
+        case InputEventType::IDLE:
+            b.resetPosition();
             break;
         default:
             break;
@@ -72,7 +128,7 @@ void loop() {
         if (!btn->begun) btn->begin_client_mode();
     }
 
-    if (btn->needs_reset(now)) {
+    if (btn->menu_mode == MAIN_MENU && btn->needs_reset(now)) {
         Serial.printf("[loop] Time since last event: %lu - resetting display\n",
                       now - btn->last_disp_event_time);
         btn->reset_display();
