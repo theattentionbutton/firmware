@@ -15,4 +15,4 @@ make
 
 ## TODO:
 
-- reconnect mqtt and wifi on disconnect
+- reconnect wifi on disconnect
