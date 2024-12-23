@@ -200,8 +200,7 @@ class AttentionButton {
         });
 
         mqtt.onDisconnect([this]() { draw_icon("LOADING"); });
-
-        mqtt.begin(MQTT_URL);
+        mqtt.begin(MQTT_URL, 30, true);
     }
 
     int setup_wifi(char *ssid, char *psk) {
