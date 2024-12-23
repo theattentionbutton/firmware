@@ -35,6 +35,8 @@ typedef enum display_event_type_t {
     MESSAGE
 } DisplayEventType;
 
+typedef enum menu_mode_t { MAIN_MENU = 0, EXTRAS, RINGTONE_SELECT } MenuMode;
+
 int disp_event_delay(DisplayEventType t) {
     switch (t) {
         case ENC_INPUT:
@@ -71,9 +73,12 @@ class AttentionButton {
     DisplayEventType last_disp_event_type = NONE;
     bool has_selected_icon = false;
     IconId current_selected_icon = EXCLAMATION;
+    MenuMode menu_mode;
 
     unsigned long last_message = 0;
     const MidiTrack *current_track = NULL;
+    int ringtone_idx = 0;
+    int extras_idx = 0;
 
     AttentionButton() {
         mx = new MATRIX7219(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
@@ -90,12 +95,31 @@ class AttentionButton {
         ::draw_icon(i, mx);
     }
 
+    void draw_number(int n) {
+        n = n > 64 ? 64 : n;
+        n = n < -64 ? -64 : n;
+        int abs_n = abs(n);
+        int full_rows = abs_n / 8;
+        int remaining = abs_n % 8;
+        mx->clear();
+        for (int row = 1; row <= full_rows; row++) {
+            mx->setRow(row, 255, 0);
+        }
+
+        if (remaining > 0) {
+            uint8_t last_row_value = (1 << remaining) - 1;
+            mx->setRow(full_rows + 1, last_row_value, 0);
+        }
+    }
+
     void draw_icon_by_id(IconId i) { ::draw_icon(i, mx); }
 
     void server_setup(const String &scan_results) {
         set_up_webserver(*server, scan_results, local_ip);
         server->begin();
     }
+
+    void mx_clear() { mx->clear(); }
 
     void mx_set_all(bool on = true) {
         for (int i = 0; i < 8; i++) {
@@ -123,7 +147,7 @@ class AttentionButton {
     void set_selected_icon(IconId id) {
         current_selected_icon = id;
         has_selected_icon = true;
-        }
+    }
 
     void message_received(const char *icon_name) {
         last_message = millis();
@@ -151,6 +175,7 @@ class AttentionButton {
             char icon[32];
             char email[255];
             int result = parse_payload(data, icon, email);
+            Serial.printf("parse result: %d\n", result);
             if (result == ERROR_TOO_LONG || result == ERROR_INVALID_FORMAT) {
                 return;
             }
@@ -173,7 +198,7 @@ class AttentionButton {
             draw_icon("READY");
         });
 
-        mqtt.onDisconnect([this]() { draw_icon("CONNECTION_ERROR"); });
+        mqtt.onDisconnect([this]() { draw_icon("LOADING"); });
 
         mqtt.begin(MQTT_URL);
     }
