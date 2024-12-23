@@ -20,21 +20,25 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
             btn->schedule_request();
             break;
         case InputEventType::CHANGED: {
-            btn->last_disp_event_type = ENC_INPUT;
-            btn->last_disp_event_time = millis();
-            btn->disp_was_reset = false;
+            btn->display_updated(ENC_INPUT, millis());
             int pos = b.position() % DRAWABLE_LENGTH;
             int counter = 0;
             for (int i = 0; i < DRAWABLE_LENGTH; i++) {
                 if (pos == counter) break;
                 counter += 1;
             }
-            btn->draw_icon_by_id(DRAWABLE_ICONS[counter]);
-            btn->current_selected_icon = DRAWABLE_ICONS[counter];
-            btn->has_selected_icon = true;
-            const char *name = icon_name(DRAWABLE_ICONS[counter]);
+            IconId id = DRAWABLE_ICONS[counter];
+            btn->draw_icon_by_id(id);
+            btn->set_selected_icon(id);
+
+            const char *name = icon_name(id);
+            Serial.printf("[debug] selected icon %s\n", name);
             break;
         }
+        case InputEventType::LONG_CLICKED:
+            Serial.println("[debug] long press");
+            play_track_by_idx(SOMETHINGS, &enc);
+            break;
         default:
             break;
     }
@@ -48,7 +52,7 @@ void setup() {
     btn = new AttentionButton();
 
     if (!LittleFS.begin(FORMAT_LITTLEFS_ON_ERR)) {
-        Serial.printf("! [error] Error initialising filesystem!\n");
+        Serial.printf("[!!! error !!!] could not init filesystem\n");
         while (1);
     }
 
@@ -68,14 +72,10 @@ void loop() {
         if (!btn->begun) btn->begin_client_mode();
     }
 
-    if (now - btn->last_disp_event_time >
-            disp_event_delay(btn->last_disp_event_type) &&
-        !btn->disp_was_reset) {
+    if (btn->needs_reset(now)) {
         Serial.printf("[loop] Time since last event: %lu - resetting display\n",
-                      now - btn->last_disp_event_type);
-        btn->draw_icon("READY");
-        btn->disp_was_reset = true;
-        btn->has_selected_icon = false;
+                      now - btn->last_disp_event_time);
+        btn->reset_display();
     }
 
     if (btn->begun) {

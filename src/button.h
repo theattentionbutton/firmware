@@ -103,6 +103,28 @@ class AttentionButton {
         }
     }
 
+    void reset_display(const char *icon = NULL) {
+        draw_icon(icon ? icon : "READY");
+        disp_was_reset = true;
+        has_selected_icon = false;
+    }
+
+    bool needs_reset(unsigned long now) {
+        return !disp_was_reset && (now - last_disp_event_time) >
+                                      disp_event_delay(last_disp_event_type);
+    }
+
+    void display_updated(DisplayEventType type, unsigned long time) {
+        disp_was_reset = false;
+        last_disp_event_time = time;
+        last_disp_event_type = type;
+    }
+
+    void set_selected_icon(IconId id) {
+        current_selected_icon = id;
+        has_selected_icon = true;
+        }
+
     void message_received(const char *icon_name) {
         last_message = millis();
         for (int i = 0; i < 3; i++) {
@@ -151,7 +173,9 @@ class AttentionButton {
             draw_icon("READY");
         });
 
-        mqtt.begin("mqtts://" MQTT_BROKER ":" MQTT_PORT);
+        mqtt.onDisconnect([this]() { draw_icon("CONNECTION_ERROR"); });
+
+        mqtt.begin(MQTT_URL);
     }
 
     int setup_wifi(char *ssid, char *psk) {
