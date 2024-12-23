@@ -234,6 +234,7 @@ class AttentionButton {
                  254, username);
         Serial.printf("[debug] %s\n", buf);
         mqtt.publish(topic, buf);
+        play_track_by_name("SUCCESS");
     }
 
     void setup_iter() {
