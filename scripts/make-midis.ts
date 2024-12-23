@@ -10,6 +10,7 @@ if (!outputFile) throw new Error("No output file specified, bailing");
 
 const output = [
     '#include <Arduino.h>',
+    '#include <EventEncoderButton.h>',
     '#include <string.h>',
     '#include "constants.h"\n',
     '#ifndef _MIDIS_H',
@@ -96,9 +97,9 @@ void invalid_tone() {
     }
 }
 
-void play_track_by_idx(MidiTrackIdx id) {
+void play_track_by_idx(MidiTrackIdx id, EventEncoderButton *button = NULL) {
     if (!id) return invalid_tone();
-
+    long start_pos = button ? button->position() : 0;
     MidiTrack t = TRACK(id);
     for (int i = 0; i < t.length; i++) {
         int *note = t.first[i];
@@ -106,6 +107,10 @@ void play_track_by_idx(MidiTrackIdx id) {
         tone(BZ1, note[0]);
         delay((unsigned long)note[1] + 10);
         noTone(BZ1);
+        if (button) {
+            button->update();
+            if (button->position() != start_pos) break;
+        }
     }
 }
 
