@@ -107,7 +107,7 @@ class AttentionButton {
         }
 
         if (remaining > 0) {
-            uint8_t last_row_value = (1 << remaining) - 1;
+            uint8_t last_row_value = (1 << remaining) - 1 << (8 - remaining);
             mx->setRow(full_rows + 1, last_row_value, 0);
         }
     }
@@ -174,6 +174,7 @@ class AttentionButton {
         mqtt.onData([this](String topic, String data, bool cont) {
             char icon[32];
             char email[255];
+            Serial.printf("[debug] payload: %s\n", data.c_str());
             int result = parse_payload(data, icon, email);
             Serial.printf("parse result: %d\n", result);
             if (result == ERROR_TOO_LONG || result == ERROR_INVALID_FORMAT) {
