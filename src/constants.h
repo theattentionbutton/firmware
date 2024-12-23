@@ -5,6 +5,7 @@
 
 #define MQTT_BROKER "mqtt-dashboard.com"
 #define MQTT_PORT "8883"
+#define MQTT_URL "mqtts://" MQTT_BROKER ":" MQTT_PORT
 
 #define MATRIX_CNT 1 // matrix count
 
