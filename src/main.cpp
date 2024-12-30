@@ -41,6 +41,8 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
             }
             break;
         case InputEventType::CHANGED: {
+            if (btn->mode != CLIENT_MODE) break;
+            if (!btn->ready) break;
             switch (btn->menu_mode) {
                 case MAIN_MENU: {
                     btn->display_updated(ENC_INPUT, millis());
