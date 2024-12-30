@@ -60,7 +60,7 @@ class AttentionButton {
     char psk[64] = {0};
     char secret[64] = {0};
     char username[256] = {0};
-    char ringtone[20] = "JUNE";
+    char *ringtone = "JUNE";
     char topic[128] = {0};
 
   public:
@@ -68,6 +68,7 @@ class AttentionButton {
     EButtonMode mode = CLIENT_MODE;
     bool begun = false;
     bool playing = false;
+    bool ready = false;
     bool disp_was_reset = true;
     unsigned long last_disp_event_time = 0;
     DisplayEventType last_disp_event_type = NONE;
@@ -197,9 +198,13 @@ class AttentionButton {
             Serial.printf("[mqtt] connected to broker\r\n");
             mqtt.subscribe(t, 0);
             draw_icon("READY");
+            ready = true;
         });
 
-        mqtt.onDisconnect([this]() { draw_icon("LOADING"); });
+        mqtt.onDisconnect([this]() {
+            draw_icon("LOADING");
+            ready = false;
+        });
         mqtt.begin(MQTT_URL, 30, true);
     }
 
@@ -223,6 +228,14 @@ class AttentionButton {
         dns = new DNSServer();
     }
 
+    void set_ringtone(char *name) {
+        if (!name) ringtone = "INVALID";
+        ringtone = name;
+        kv_put("ringtone", ringtone);
+    }
+
+    const char *get_ringtone() { return ringtone; }
+
     void begin_client_mode() {
         mode = CLIENT_MODE;
         if (begun) return;
@@ -241,8 +254,8 @@ class AttentionButton {
         }
 
         char ringtone_buf[20] = {0};
-        int len = kv_get("ringtone", ringtone_buf, 16);
-        if (len) strncpy(ringtone, ringtone_buf, 16);
+        int len = kv_get("ringtone", ringtone_buf, 19);
+        if (len) strncpy(ringtone, ringtone_buf, 19);
 
         SHA256 hasher;
         hasher.doUpdate(secret);
