@@ -1,5 +1,7 @@
 #include "icons.h"
 #include <ArduinoJson.h>
+#include <Encoder.h>
+#include <EventEncoderButton.h>
 #include <MATRIX7219.h>
 
 #define BAUD_RATE 9600
@@ -106,8 +108,20 @@ void fatal_error(IconId id, MATRIX7219 *mx) {
     }
 }
 
-void loading_screen(const char *msg) {
-    Serial.printf("DEBUG: loading screen\n");
+int sign(int num) {
+    if (num > 0) return 1;
+    if (num < 0) return -1;
+    return 0;
 }
+
+class EncoderBtn : public EventEncoderButton {
+    bool music_stopped = false;
+
+  public:
+    using EventEncoderButton::EventEncoderButton;
+    void stop_music() { music_stopped = true; }
+    void allow_music() { music_stopped = false; }
+    bool is_music_stopped() { return music_stopped; }
+};
 
 #endif
