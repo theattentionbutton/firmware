@@ -60,10 +60,10 @@ window.addEventListener("DOMContentLoaded", async () => {
             );
         }
 
-        if (split.some((i) => i.length < 6 || i.length > 10)) {
+        if (split.some((i) => i.length < 5 || i.length > 11)) {
             if (field) field.value = "";
             return log(
-                "The parts of the secret should be between 6 and 10 characters long.",
+                "The parts of the secret should be between 5 and 11 characters long.",
             );
         }
 
@@ -172,11 +172,11 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
         if (
             fields.some((field) =>
-                field.value.length < 6 || field.value.length > 10
+                field.value.length < 5 || field.value.length > 11
             )
         ) {
             return cfa.message(
-                "Secret parts must be between 6 and 10 characters long.",
+                "Secret parts must be between 5 and 11 characters long.",
             );
         }
 
