@@ -15,4 +15,7 @@ make
 
 ## TODO:
 
-- reconnect wifi on disconnect
+- add a silent mode
+- add brightness control for display
+- add client certificate support (see BearSSL setClientRSACert /
+  setClientECCert)
