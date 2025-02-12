@@ -97,7 +97,7 @@ void invalid_tone() {
     }
 }
 
-void play_track_by_idx(MidiTrackIdx id, EventEncoderButton *button = NULL) {
+void play_track_by_idx(MidiTrackIdx id, EncoderBtn *button = NULL) {
     if (!id) return invalid_tone();
     long start_pos = button ? button->position() : 0;
     MidiTrack t = TRACK(id);

@@ -71,7 +71,7 @@ output.push(
     '',
     '#define DRAWABLE_LENGTH (sizeof(DRAWABLE_ICONS)/sizeof(DRAWABLE_ICONS[0]))',
     '',
-    `const byte ICONS[${Object.keys(icons).length}][8] PROGMEM = {`,
+    `const byte ICONS[${Object.keys(icons).length}][8] = {`,
     ...Object.entries(icons).map(([key, value], idx) => {
         const delimiter = idx === Object.entries(icons).length - 1 ? "" : ",";
         return `    {${value.join(", ")}}${delimiter} // ${key}`;

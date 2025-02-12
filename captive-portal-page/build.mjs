@@ -42,7 +42,7 @@ await writeFile("./src/captive_portal_index.h", `\
 #ifndef __CAPTIVE_PORTAL_INDEX
 #define __CAPTIVE_PORTAL_INDEX
 
-const char index_html[] PROGMEM = R"====(
+const char index_html[] = R"====(
 ${final}
 )====";
 
