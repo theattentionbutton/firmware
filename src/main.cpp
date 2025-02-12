@@ -26,8 +26,7 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
                     break;
                 }
                 case RINGTONE_SELECT: {
-                    btn->set_ringtone(
-                        (char *)TRACK_NAMES[btn->ringtone_idx + 1]);
+                    btn->set_ringtone((char *)TRACK_NAMES[btn->ringtone_idx]);
                     Serial.printf("Updated ringtone: %s\n",
                                   btn->get_ringtone());
                     enc.stop_music();
@@ -68,6 +67,7 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
                 case RINGTONE_SELECT: {
                     int pos = abs(b.position()) % TRACK_COUNT;
                     btn->draw_number(pos);
+                    printf("Selected ringtone: %s\n", TRACK_NAMES[pos]);
                     if (pos) {
                         play_track_by_idx((MidiTrackIdx)pos, &enc);
                         btn->ringtone_idx = pos;

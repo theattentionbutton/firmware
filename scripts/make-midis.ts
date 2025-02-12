@@ -44,13 +44,15 @@ for await (const file of Deno.readDir(midisDir)) {
 }
 
 output.push(...[
-    `#define TRACK_COUNT ${tracks.length}`,
+    `#define TRACK_COUNT ${tracks.length + 1}`,
     `typedef enum midi_track_idx {`,
     '    INVALID = 0,',
+    '    SILENCE,',
     '    ' + tracks.map(itm => itm.name).join(',\n    '),
     '} MidiTrackIdx;\n',
     `const char TRACK_NAMES[][16] = {`,
     '    "INVALID",',
+    '    "SILENCE",',
     '    ' + tracks.map(itm => `"${itm.name}"`).join(',\n    '),
     '};',
     `\
@@ -59,12 +61,14 @@ typedef struct midi_track_t {
     int (*first)[3];
 } MidiTrack;
 `,
+    'int SILENCE_NOTES[][3] = {0, 10000, 0};\n',
     ...tracks.map(track => {
         return `\
 int ${track.name}_NOTES[][3] = {${track.notes.join(', ')}};
 `
     }),
     'MidiTrack tracks[] = {',
+    '    {1, SILENCE_NOTES},',
     '    ' + tracks.map(track => {
         return `{${track.notes.length}, ${track.name}_NOTES}`
     }).join(',\n    '),
@@ -101,6 +105,10 @@ void play_track_by_idx(MidiTrackIdx id, EncoderBtn *button = NULL) {
     if (!id) return invalid_tone();
     long start_pos = button ? button->position() : 0;
     MidiTrack t = TRACK(id);
+    if (id == SILENCE) {
+        delay((*t.first)[0]);
+        return;
+    }
     for (int i = 0; i < t.length; i++) {
         int *note = t.first[i];
         delay(note[2]);

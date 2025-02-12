@@ -253,6 +253,8 @@ class AttentionButton {
             fatal_error(CONNECTION_ERROR, mx);
         }
 
+        printf("[debug] secret: \"%s\"\n", secret);
+
         char ringtone_buf[20] = {0};
         int len = kv_get("ringtone", ringtone_buf, 19);
         if (len) strncpy(ringtone, ringtone_buf, 19);
