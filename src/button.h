@@ -205,7 +205,7 @@ class AttentionButton {
             draw_icon("LOADING");
             ready = false;
         });
-        mqtt.begin(MQTT_URL, 30, true);
+        mqtt.begin(MQTT_URL, username, secret, 30, true);
     }
 
     int setup_wifi(char *ssid, char *psk) {
