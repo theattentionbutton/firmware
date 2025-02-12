@@ -4,20 +4,20 @@
 #include "constants.h"
 #include "icons.h"
 #include "utils.h"
-#include <Encoder.h>
-#include <EventEncoderButton.h>
 #include <EventInputBase.h>
 
 AttentionButton *btn;
 
 // Create an EventEncoderButton input
-EventEncoderButton enc(ENC_DAT, ENC_CLK,
-                       ENC_SW); // First two should be interrupt pins
+EncoderBtn enc(ENC_DAT, ENC_CLK, ENC_SW); // First two should be interrupt pins
 
 IconId extras_icons[] = {RINGTONE};
 
 int icon_id = 0;
+unsigned long last_enc_event = 0;
+
 void on_enc_input(InputEventType ev, EventEncoderButton &b) {
+    last_enc_event = millis();
     switch (ev) {
         case InputEventType::CLICKED:
             switch (btn->menu_mode) {
@@ -26,7 +26,11 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
                     break;
                 }
                 case RINGTONE_SELECT: {
-                    kv_put("ringtone", TRACK_NAMES[btn->ringtone_idx]);
+                    btn->set_ringtone(
+                        (char *)TRACK_NAMES[btn->ringtone_idx + 1]);
+                    Serial.printf("Updated ringtone: %s\n",
+                                  btn->get_ringtone());
+                    enc.stop_music();
                     play_track_by_name("SUCCESS");
                     break;
                 }
@@ -94,9 +98,6 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
                 }
             }
             break;
-        case InputEventType::IDLE:
-            b.resetPosition();
-            break;
         default:
             break;
     }
@@ -116,6 +117,7 @@ void setup() {
 
     enc.setCallback(on_enc_input);
     enc.setPositionDivider(2);
+    enc.setRateLimit(10);
 }
 
 void loop() {
@@ -136,6 +138,10 @@ void loop() {
         btn->reset_display();
     }
 
+    if (btn->menu_mode == MAIN_MENU && now - last_enc_event > 30000) {
+        enc.resetPosition();
+    }
+
     if (btn->begun) {
         switch (btn->mode) {
             case SETUP_MODE:
@@ -144,7 +150,7 @@ void loop() {
                 break;
             case CLIENT_MODE:
                 btn->do_request(now);
-                btn->handle_mqtt();
+                btn->handle_mqtt(now);
                 break;
         }
     }
