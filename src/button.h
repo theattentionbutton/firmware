@@ -9,7 +9,7 @@
 #include <Crypto.h>
 #include <DNSServer.h>
 #include <ESP8266MQTTClient.h>
-#include <ESPAsyncWebSrv.h>
+#include <ESP8266WebServer.h>
 #include <MATRIX7219.h>
 #include <WiFiClientSecure.h>
 
@@ -56,7 +56,7 @@ int disp_event_delay(DisplayEventType t) {
 class AttentionButton {
     MATRIX7219 *mx;
     MQTTClient mqtt;
-    AsyncWebServer *server;
+    ESP8266WebServer *server;
     unsigned long last_req_time = 0;
     bool was_ap_setup = false;
     bool request_pending = false;
@@ -237,7 +237,7 @@ class AttentionButton {
                            ? "[init] Credentials not set, defaulting to setup"
                            : "[init] Entering setup mode...");
         begun = true;
-        server = new AsyncWebServer(80);
+        server = new ESP8266WebServer(80);
         dns = new DNSServer();
     }
 
@@ -349,6 +349,7 @@ class AttentionButton {
             return;
         }
         process_dns();
+        server->handleClient();
     }
 
     void play_track(const char *name) { play_track_by_name(name); }

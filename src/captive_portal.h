@@ -1,7 +1,5 @@
-#include <ESP8266WiFi.h>
-#include <ESPAsyncTCP.h>
-
 #include <DNSServer.h>
+#include <ESP8266WiFi.h>
 
 #ifndef __CAPTIVE_PORTAL
 #define __CAPTIVE_PORTAL
@@ -15,7 +13,7 @@
     6 // 2.4ghz channel 6
       // https://en.wikipedia.org/wiki/List_of_WLAN_channels#2.4_GHz_(802.11b/g/n/ax)
 
-// Define the DNS interval in milliseconds between processing DNS requests
+// the DNS interval in milliseconds between processing DNS requests
 #define DNS_INTERVAL 50
 
 void setup_dns_server(DNSServer &dns, const IPAddress &local_ip) {

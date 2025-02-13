@@ -3,7 +3,7 @@
 #include "captive_portal_index.h"
 #include "littlefs_kv.h"
 #include "utils.h"
-#include <ESPAsyncWebSrv.h>
+#include <ESP8266WebServer.h>
 #include <flash_hal.h>
 
 #ifndef __CAPTIVE_PORTAL_SERVER
@@ -14,22 +14,19 @@ const char *JSON_RESP_INVALID_VALUE = "{\"message\": \"invalid-value\"}";
 const char *JSON_RESP_MISSING_VALUE = "{\"message\": \"missing-value\"}";
 
 #define DEFINE_RU_ROUTE(path, key, max_len)                                    \
-    server.on(path, HTTP_ANY, [](AsyncWebServerRequest *request) {             \
-        handle_ru_route(request, key, max_len);                                \
-    });
+    server.on(path, HTTP_ANY,                                                  \
+              [&server]() { handle_ru_route(server, key, max_len); });
 
 // RU = Read, Update
-void handle_ru_route(AsyncWebServerRequest *request, const char *param,
+void handle_ru_route(ESP8266WebServer &server, const char *param,
                      size_t max_len) {
-    auto respond = [&request](int code, const char *content) {
-        AsyncWebServerResponse *res =
-            request->beginResponse(code, "application/json", content);
-        request->send(res);
+    auto respond = [&server](int code, const char *content) {
+        server.send(code, "application/json", content);
     };
 
-    if (request->method() == HTTP_POST) {
-        if (request->hasParam("value", true)) {
-            String s = request->getParam("value", true)->value();
+    if (server.method() == HTTP_POST) {
+        if (server.hasArg("value")) {
+            String s = server.arg("value");
             if (s.length() > max_len) {
                 return respond(400, JSON_RESP_INVALID_VALUE);
             }
@@ -74,71 +71,82 @@ char routes_404[][32] = {
 
 #define UPDATE_DRY_RUN 0 // set to 1 to not actually perform updates
 
-void handleUpdateUpload(AsyncWebServerRequest *request, String filename,
-                        size_t index, uint8_t *data, size_t len, bool final) {
-    size_t content_length = request->contentLength();
+void handleUpdate(ESP8266WebServer &server, size_t *written) {
+    if (server.uri() != "/update") return;
+    HTTPUpload &upload = server.upload();
+    size_t content_length = upload.contentLength;
 
-    if (!index) { // Start of upload
-        if (!request->hasParam("MD5", true)) {
-            return request->send(400, "text/plain", "MD5 parameter missing");
-        }
+    switch (upload.status) {
+        case UPLOAD_FILE_START: {
+            if (!server.hasArg("MD5")) {
+                return server.send(400, "text/plain",
+                                   "No md5 parameter supplied.");
+            }
 
-        Serial.printf("[update] Content-Length: %lu\n", content_length);
-        Serial.printf("[update] Flash chip size: %u\n",
-                      ESP.getFlashChipRealSize());
-        Serial.printf("[update] Free sketch space: %u\n",
-                      ESP.getFreeSketchSpace());
+            Serial.printf("[update] Content-Length: %lu\n", content_length);
+            Serial.printf("[update] Flash chip size: %u\n",
+                          ESP.getFlashChipRealSize());
+            Serial.printf("[update] Free sketch space: %u\n",
+                          ESP.getFreeSketchSpace());
 
-        const char *md5 = request->getParam("MD5", true)->value().c_str();
-        Serial.printf("[update] md5: %s\n", md5);
-
+            const char *md5 = server.arg("MD5").c_str();
+            Serial.printf("[update] md5: %s\n", md5);
 #if UPDATE_DRY_RUN == 0
-        if (!Update.setMD5(md5)) {
-            return request->send(400, "text/plain", "MD5 parameter invalid");
-        }
+            if (!Update.setMD5(md5)) {
+                return server.send(400, "text/plain", "MD5 parameter invalid");
+            }
 
-        if (!Update.begin(content_length, U_FLASH)) {
-            Update.printError(Serial);
-            return request->send(500, "text/plain", "OTA Update Begin Failed");
-        }
+            if (!Update.begin(content_length, U_FLASH)) {
+                Update.printError(Serial);
+                return server.send(500, "text/plain",
+                                   "OTA Update Begin Failed");
+            }
 #endif
-
-        Serial.printf("[update] Starting update\n", content_length, md5);
-    }
-
-    Serial.printf("[update] Free heap: %u bytes\n", ESP.getFreeHeap());
-    Serial.printf("[update] writing chunk %lu\n", index);
+            Serial.printf("[update] Starting update\n");
+            break;
+        }
+        case UPLOAD_FILE_WRITE:
+            Serial.printf("[update] Free heap: %u bytes\n", ESP.getFreeHeap());
+            *written += upload.currentSize;
+            Serial.printf("[update] Upload progress: %.2f\n",
+                          (*written / upload.totalSize) * 100);
 #if UPDATE_DRY_RUN == 0
-    // Write chunk
-    if (Update.write(data, len) != len) {
-        Update.printError(Serial);
-    } else {
-        Serial.printf("[update] Progress: %d%%\n",
-                      (Update.progress() / Update.size()) * 100);
-    }
+            // Write chunk
+            if (Update.write(upload.buf, upload.currentSize) !=
+                upload.currentSize) {
+                String err = Update.getErrorString();
+                Serial.printf("[update] error: %s\n", err.c_str());
+                return server.send(500, "text/plain", "Update error: " + err);
+            } else {
+                Serial.printf("[update] actual progress %u %u",
+                              Update.progress(), Update.size());
+            }
+
 #endif
-
-    if (final) { // End of upload
-        AsyncWebServerResponse *response = request->beginResponse(
-            302, "application/json", "Please wait while the device reboots");
-        request->send(response);
-
+            break;
+        case UPLOAD_FILE_END:
 #if UPDATE_DRY_RUN == 0
-        if (!Update.end(true)) {
-            Update.printError(Serial);
-        } else {
-            Serial.println("[update] Update complete");
-            Serial.flush();
-            delay(100);
-            ESP.restart();
-        }
-#else
-        Serial.println("[update] Dry run complete – no reboot.");
+            if (!Update.end(true)) {
+                String err = Update.getErrorString();
+                Serial.printf("[update] error: %s\n", err.c_str());
+                return server.send(500, "text/plain",
+                                   "Error finalizing update: " + err);
+            } else {
+                Serial.println("[update] update completed successfully");
+                Serial.flush();
+            }
 #endif
+            Serial.println("[update] Dry run complete. Not restarting.");
+            break;
     }
 }
 
-void set_up_webserver(AsyncWebServer &server, const String &scanResults,
+void redirect(ESP8266WebServer &server, const char *location) {
+    server.sendHeader("Location", location, true);
+    server.send(302, "text/plain", "");
+}
+
+void set_up_webserver(ESP8266WebServer &server, const String &scan_results,
                       const IPAddress &local_ip) {
     //======================== Webserver ========================
     // WARNING IOS (and maybe macos) WILL NOT POP UP IF IT CONTAINS THE WORD
@@ -150,45 +158,49 @@ void set_up_webserver(AsyncWebServer &server, const String &scanResults,
     // that bring the total over 128KB SAFARI (IOS) popup browser has some
     // severe limitations (javascript disabled, cookies disabled)
 
-    auto local_ip_handler = [](AsyncWebServerRequest *request) {
-        request->redirect(LOCAL_IP_URL);
-    };
+    auto local_ip_handler = [&server]() { redirect(server, LOCAL_IP_URL); };
 
     for (auto &route : routes_to_local_ip) {
         server.on(route, local_ip_handler);
     }
 
-    auto send_404 = [](AsyncWebServerRequest *request) { request->send(404); };
+    auto send_404 = [&server]() {
+        server.send(404, "text/plain", "Not Found");
+    };
 
     for (auto &route : routes_404) {
         server.on(route, send_404);
     }
 
-    auto send_200 = [](AsyncWebServerRequest *request) { request->send(200); };
+    auto send_200 = [&server]() { server.send(200, "text/plain", "OK"); };
 
     for (auto &route : routes_200) {
         server.on(route, send_200);
     }
 
     // Required
-    server.on("/connecttest.txt", [](AsyncWebServerRequest *request) {
-        request->redirect("http://logout.net");
+    server.on("/connecttest.txt", [&server]() {
+        redirect(server, "http://logout.net");
     }); // windows 11 captive portal workaround
 
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send_P(200, "text/html", index_html);
+    server.on("/", HTTP_GET, [&server]() {
+        server.send_P(200, "text/html", index_html, sizeof(index_html));
     });
 
-    server.on("/scan", HTTP_ANY, [scanResults](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *res =
-            request->beginResponse(200, "application/json", scanResults);
-        request->send(res);
+    server.on("/scan", HTTP_ANY, [&server, scan_results]() {
+        server.send(200, "application/json", scan_results);
     });
 
+    size_t written = 0;
     server.on(
         "/update", HTTP_POST,
-        [](AsyncWebServerRequest *request) { request->send(200); },
-        handleUpdateUpload);
+        [&server]() {
+            Serial.flush();
+            server.send(
+                200, "text/plain",
+                "Update completed successfully. The device will restart.");
+        },
+        [&server, &written]() { handleUpdate(server, &written); });
 
     DEFINE_RU_ROUTE("/secret", "secret", 64 - 1);
     DEFINE_RU_ROUTE("/psk", "psk", 64 - 1);
