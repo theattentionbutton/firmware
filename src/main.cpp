@@ -11,7 +11,8 @@ AttentionButton *btn;
 // Create an EventEncoderButton input
 EncoderBtn enc(ENC_DAT, ENC_CLK, ENC_SW); // First two should be interrupt pins
 
-IconId extras_icons[] = {RINGTONE};
+#define EXTRAS_COUNT 2
+IconId extras_icons[EXTRAS_COUNT] = {RINGTONE, LIGHTBULB};
 
 int icon_id = 0;
 unsigned long last_enc_event = 0;
@@ -33,11 +34,21 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
                     play_track_by_name("SUCCESS");
                     break;
                 }
+                case BRIGHTNESS_SELECT: {
+                    Serial.printf("[debug] Updated brightness value: %d\n",
+                                  btn->brightness_value);
+                    btn->set_brightness(btn->brightness_value);
+                    play_track_by_name("SUCCESS");
+                    break;
+                }
                 case EXTRAS: {
+                    btn->menu_mode = (MenuMode)(EXTRAS + (1 + btn->extras_idx));
+                    btn->mx_clear();
                     if (btn->extras_idx == 0) {
-                        btn->menu_mode = RINGTONE_SELECT;
                         btn->mx_clear();
                         btn->ringtone_idx = 0;
+                    } else if (btn->extras_idx == 1) {
+                        btn->draw_number(btn->brightness_value);
                     }
                     break;
                 }
@@ -75,20 +86,35 @@ void on_enc_input(InputEventType ev, EventEncoderButton &b) {
                     break;
                 }
 
+                case BRIGHTNESS_SELECT: {
+                    btn->brightness_value =
+                        CLAMP(btn->brightness_value + b.increment(), 1, 15);
+                    btn->mx_update_brightness();
+                    btn->draw_number(btn->brightness_value);
+                    break;
+                }
+
                 case EXTRAS: {
+                    btn->extras_idx += b.increment();
+                    btn->extras_idx =
+                        CLAMP(btn->extras_idx, 0, EXTRAS_COUNT - 1);
+                    const char *name = icon_name(extras_icons[btn->extras_idx]);
+                    btn->draw_icon(name);
                     break;
                 }
             }
             break;
         }
         case InputEventType::LONG_CLICKED:
-            Serial.println("[debug] long press");
             switch (btn->menu_mode) {
                 case RINGTONE_SELECT:
+                case BRIGHTNESS_SELECT:
                 case MAIN_MENU: {
                     btn->menu_mode = EXTRAS;
                     btn->draw_icon_by_id(extras_icons[0]);
                     btn->extras_idx = 0;
+                    btn->brightness_value = btn->get_stored_brightness();
+                    btn->mx_update_brightness();
                     break;
                 }
                 case EXTRAS: {
@@ -108,12 +134,9 @@ void setup() {
         pinMode(mode[0], mode[1]);
     }
 
-    btn = new AttentionButton();
+    bool fs_init_success = LittleFS.begin(FORMAT_LITTLEFS_ON_ERR);
 
-    if (!LittleFS.begin(FORMAT_LITTLEFS_ON_ERR)) {
-        Serial.printf("[!!! error !!!] could not init filesystem\n");
-        while (1);
-    }
+    btn = new AttentionButton(fs_init_success);
 
     enc.setCallback(on_enc_input);
     enc.setPositionDivider(2);

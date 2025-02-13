@@ -35,7 +35,12 @@ typedef enum display_event_type_t {
     MESSAGE
 } DisplayEventType;
 
-typedef enum menu_mode_t { MAIN_MENU = 0, EXTRAS, RINGTONE_SELECT } MenuMode;
+typedef enum menu_mode_t {
+    MAIN_MENU = 0,
+    EXTRAS,
+    RINGTONE_SELECT,
+    BRIGHTNESS_SELECT
+} MenuMode;
 
 int disp_event_delay(DisplayEventType t) {
     switch (t) {
@@ -79,15 +84,21 @@ class AttentionButton {
     unsigned long last_message = 0;
     const MidiTrack *current_track = NULL;
     int ringtone_idx = 0;
+    int brightness_value = 3;
     int extras_idx = 0;
 
-    AttentionButton() {
-        mx = new MATRIX7219(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
-        mx_init();
-        draw_icon("LOADING");
+    AttentionButton(bool fs_init_success) {
         Serial.begin(BAUD_RATE);
         while (!Serial);
         Serial.print("\n[init] AttentionButton start...\n");
+        mx = new MATRIX7219(MATRIX_DAT, MATRIX_SEL, MATRIX_CLK, MATRIX_CNT);
+        mx_init();
+        if (!fs_init_success) {
+            Serial.printf("[!!! error !!!] could not init filesystem\n");
+            draw_icon("EXCLAMATION");
+            while (1);
+        }
+        draw_icon("LOADING");
     }
 
     void draw_icon(const char *name) {
@@ -127,6 +138,8 @@ class AttentionButton {
             mx->setRow(i + 1, on ? 255 : 0, 0);
         }
     }
+
+    void mx_update_brightness() { mx->setBrightness(brightness_value); }
 
     void reset_display(const char *icon = NULL) {
         draw_icon(icon ? icon : "READY");
@@ -177,14 +190,14 @@ class AttentionButton {
             char email[255];
             Serial.printf("[debug] payload: %s\n", data.c_str());
             int result = parse_payload(data, icon, email);
-            Serial.printf("parse result: %d\n", result);
+            Serial.printf("[debug] payload parse result: %d\n", result);
             if (result == ERROR_TOO_LONG || result == ERROR_INVALID_FORMAT) {
                 return;
             }
             if (strcmp(email, username) == 0) {
                 Serial.println("[debug] got own message");
             } else {
-                Serial.printf("[debug] iconid: %s, email: %s\n", icon, email);
+                Serial.printf("[debug] icon: %s, email: %s\n", icon, email);
                 message_received(icon);
             }
         });
@@ -234,6 +247,25 @@ class AttentionButton {
         kv_put("ringtone", ringtone);
     }
 
+    void set_brightness(int brightness) {
+        brightness = CLAMP(brightness, 1, 15);
+        char str[3] = {0};
+        snprintf(str, sizeof(str), "%d", brightness);
+        kv_put("brightness", str);
+    }
+
+    int get_stored_brightness() {
+        char str[3] = {0};
+        kv_get("brightness", str, 3);
+        if (!*str) {
+            return 3;
+        }
+        int parsed = atoi(str);
+        if (parsed < 0) return 1;
+        if (parsed > 15) return 15;
+        return parsed;
+    }
+
     const char *get_ringtone() { return ringtone; }
 
     void begin_client_mode() {
@@ -253,7 +285,7 @@ class AttentionButton {
             fatal_error(CONNECTION_ERROR, mx);
         }
 
-        printf("[debug] secret: \"%s\"\n", secret);
+        Serial.printf("[debug] secret: \"%s\"\n", secret);
 
         char ringtone_buf[20] = {0};
         int len = kv_get("ringtone", ringtone_buf, 19);
@@ -277,7 +309,9 @@ class AttentionButton {
     void mx_init() {
         mx->begin();
         mx->clear();
-        mx->setBrightness(3);
+        int brightness = get_stored_brightness();
+        Serial.printf("[debug] got stored brightness %d\n", brightness);
+        mx->setBrightness(brightness);
         mx->setSwap(1);
         mx->setReverse(1);
     }
@@ -296,7 +330,7 @@ class AttentionButton {
         char buf[512] = {0};
         snprintf(buf, 512, "#%.*s#%.*s#", 20, icon_name(current_selected_icon),
                  254, username);
-        Serial.printf("[debug] %s\n", buf);
+        Serial.printf("[debug] sending payload `%s`\n", buf);
         mqtt.publish(topic, buf);
         play_track_by_name("SUCCESS");
     }
