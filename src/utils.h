@@ -20,6 +20,10 @@
 #define REMOTE_URL "https://theattentionbutton.in"
 #define ROUTE(x) (REMOTE_URL x)
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define CLAMP(value, min, max) (MAX((min), MIN((value), (max))))
+
 typedef enum button_mode_t { SETUP_MODE = 1, CLIENT_MODE } EButtonMode;
 
 #ifndef ESP_ARDUINO_VERSION_VAL
