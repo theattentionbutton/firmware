@@ -275,7 +275,6 @@ input[type=file] {
 .networks {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    place-items: center;
     width: 100%;
     margin: 0.4rem;
     gap: 1rem;
@@ -340,7 +339,7 @@ input {
 
     .form-group {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
         align-self: center;
         gap: 0.4rem;
     }
