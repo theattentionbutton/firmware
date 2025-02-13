@@ -29,12 +29,18 @@ function humanReadableRssi(rssi: number) {
 
 const fetchScanResults = async () => {
     const res = await fetch('/scan');
-    if (!res.ok) {
-        await cfa.message('Error fetching Wi-Fi scan results. Please enter details manually.');
-        return [];
-    };
-    const parsed = await res.json();
-    return (parsed?.scan_results || []) as ScanResult[];
+    const err = () => cfa.message('Error fetching Wi-Fi scan results. Please enter details manually.');
+    if (!res.ok) await err();
+    try {
+        const txt = await res.text();
+        console.log(`received: ${txt}`);
+        const parsed = await JSON.parse(txt);
+        return (parsed?.scan_results || []) as ScanResult[];
+    }
+    catch {
+        await err();
+    }
+    return [];
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
