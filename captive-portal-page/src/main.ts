@@ -257,16 +257,17 @@ window.addEventListener("DOMContentLoaded", async () => {
 
         const body = new FormData();
         body.append("MD5", hash);
+        body.append("file-size", file.size.toString());
         body.append("update", file, file.name);
 
         try {
             const res = await fetch("/update", { method: "POST", body });
             if (res.ok) {
-                await cfa.message("update started. Please wait for the device to reboot.");
+                await cfa.message(await res.text());
                 firmwareField.value = '';
             }
             else {
-                await cfa.fatal("update failed: " + await res.text());
+                await cfa.fatal("Update failed: " + await res.text());
             }
         }
         catch (e) {

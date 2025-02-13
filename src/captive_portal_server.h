@@ -71,19 +71,45 @@ char routes_404[][32] = {
 
 #define UPDATE_DRY_RUN 0 // set to 1 to not actually perform updates
 
-void handleUpdate(ESP8266WebServer &server, size_t *written) {
+typedef enum update_error_type_t {
+    UPDATE_OK,
+    UPDATE_UNINITIALIZED,
+    MD5_MISSING_OR_INVALID,
+    UPDATER_ERROR,
+} UpdateErrorType;
+
+typedef struct update_status_t {
+    char msg[64];
+    UpdateErrorType type;
+    unsigned long last_update;
+    int file_size;
+} UpdateStatus;
+
+UpdateStatus update_status = {.msg = {0},
+                              .type = UpdateErrorType::UPDATE_OK,
+                              .last_update = millis(),
+                              .file_size = -1};
+
+void handleUpdate(ESP8266WebServer &server) {
     if (server.uri() != "/update") return;
     HTTPUpload &upload = server.upload();
     size_t content_length = upload.contentLength;
-
+    if (update_status.file_size < 0 && server.hasArg("file-size")) {
+        String val = server.arg("file-size");
+        int parsed = atoi(val.c_str());
+        update_status.file_size = parsed ? parsed : content_length;
+    }
+    if (update_status.type != UpdateErrorType::UPDATE_OK) {
+        return;
+    }
     switch (upload.status) {
         case UPLOAD_FILE_START: {
             if (!server.hasArg("MD5")) {
-                return server.send(400, "text/plain",
-                                   "No md5 parameter supplied.");
+                update_status.type = MD5_MISSING_OR_INVALID;
+                return;
             }
 
-            Serial.printf("[update] Content-Length: %lu\n", content_length);
+            Serial.printf("[update] Content-Length: %u\n", content_length);
             Serial.printf("[update] Flash chip size: %u\n",
                           ESP.getFlashChipRealSize());
             Serial.printf("[update] Free sketch space: %u\n",
@@ -93,52 +119,59 @@ void handleUpdate(ESP8266WebServer &server, size_t *written) {
             Serial.printf("[update] md5: %s\n", md5);
 #if UPDATE_DRY_RUN == 0
             if (!Update.setMD5(md5)) {
-                return server.send(400, "text/plain", "MD5 parameter invalid");
+                update_status.type = UpdateErrorType::MD5_MISSING_OR_INVALID;
+                return;
             }
 
             if (!Update.begin(content_length, U_FLASH)) {
-                Update.printError(Serial);
-                return server.send(500, "text/plain",
-                                   "OTA Update Begin Failed");
+                update_status.type = UpdateErrorType::UPDATER_ERROR;
+                strncpy(update_status.msg, "Could not start update!", 63);
+                return;
             }
 #endif
             Serial.printf("[update] Starting update\n");
             break;
         }
-        case UPLOAD_FILE_WRITE:
-            Serial.printf("[update] Free heap: %u bytes\n", ESP.getFreeHeap());
-            *written += upload.currentSize;
-            Serial.printf("[update] Upload progress: %.2f\n",
-                          (*written / upload.totalSize) * 100);
+        case UPLOAD_FILE_WRITE: {
+            unsigned long now = millis();
+            if (now - update_status.last_update > 500) {
+                update_status.last_update = now;
+                Serial.printf("[update] Free heap: %u bytes\n",
+                              ESP.getFreeHeap());
+                Serial.printf(
+                    "[update] Upload progress: %u bytes, %.2f%%\n",
+                    upload.totalSize,
+                    ((float)upload.totalSize / update_status.file_size) * 100);
+            }
 #if UPDATE_DRY_RUN == 0
             // Write chunk
             if (Update.write(upload.buf, upload.currentSize) !=
                 upload.currentSize) {
                 String err = Update.getErrorString();
-                Serial.printf("[update] error: %s\n", err.c_str());
-                return server.send(500, "text/plain", "Update error: " + err);
-            } else {
-                Serial.printf("[update] actual progress %u %u",
-                              Update.progress(), Update.size());
+                update_status.type = UPDATER_ERROR;
+                strncpy(update_status.msg, err.c_str(), 63);
+                return;
             }
-
 #endif
             break;
-        case UPLOAD_FILE_END:
+        }
+        case UPLOAD_FILE_END: {
 #if UPDATE_DRY_RUN == 0
             if (!Update.end(true)) {
                 String err = Update.getErrorString();
-                Serial.printf("[update] error: %s\n", err.c_str());
-                return server.send(500, "text/plain",
-                                   "Error finalizing update: " + err);
-            } else {
-                Serial.println("[update] update completed successfully");
-                Serial.flush();
+                strncpy(update_status.msg, err.c_str(), 63);
+                update_status.type = UPDATER_ERROR;
             }
-#endif
+#else
             Serial.println("[update] Dry run complete. Not restarting.");
+#endif
+            break;
+        }
+        default:
             break;
     }
+
+    esp_yield();
 }
 
 void redirect(ESP8266WebServer &server, const char *location) {
@@ -191,16 +224,35 @@ void set_up_webserver(ESP8266WebServer &server, const String &scan_results,
         server.send(200, "application/json", scan_results);
     });
 
-    size_t written = 0;
     server.on(
         "/update", HTTP_POST,
         [&server]() {
-            Serial.flush();
-            server.send(
-                200, "text/plain",
-                "Update completed successfully. The device will restart.");
+            int code = 200;
+            const char *msg =
+                "Update completed successfully! The device will now restart.";
+            switch (update_status.type) {
+                case UpdateErrorType::MD5_MISSING_OR_INVALID:
+                    msg = "Missing or invalid MD5.";
+                    code = 400;
+                    break;
+                case UpdateErrorType::UPDATER_ERROR:
+                    msg = update_status.msg;
+                    code = 500;
+                    break;
+                default:
+                    break;
+            }
+
+            server.client().setNoDelay(true);
+            server.send(code, "text/plain", msg);
+
+            if (code == 200) {
+                delay(500);
+                server.client().stop();
+                ESP.restart();
+            }
         },
-        [&server, &written]() { handleUpdate(server, &written); });
+        [&server]() { handleUpdate(server); });
 
     DEFINE_RU_ROUTE("/secret", "secret", 64 - 1);
     DEFINE_RU_ROUTE("/psk", "psk", 64 - 1);
