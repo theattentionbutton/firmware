@@ -4,6 +4,9 @@
             "ESNext.Array",
             "DOM",
             "ESNext",
-        ]
+        ],
+        "target": "ES2020",
+        "moduleResolution": "nodenext",
+        "allowImportingTsExtensions": true
     }
 }

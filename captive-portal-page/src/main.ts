@@ -1,5 +1,6 @@
-import { select, selectAll, nu, html } from "campfire.js";
+import { select, selectAll, nu, html, escape } from "campfire.js";
 import cfa from "cf-alert";
+import { md5 } from "./md5.ts";
 
 interface ScanResult {
     ssid: string,
@@ -41,6 +42,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     const ssidField = select("#wifi-ssid") as HTMLInputElement;
     const pskField = select("#wifi-psk") as HTMLInputElement;
     const usernameField = select("#username") as HTMLInputElement;
+    const firmwareField = select("#firmware-file") as HTMLInputElement;
+    const firmwareSubmit = select("#firmware-submit") as HTMLButtonElement;
 
     const setSecret = (
         str: string | undefined,
@@ -205,4 +208,63 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
         catch { }
     });
+
+    const updateFirmwareLabel = () => {
+        const fileLabel = select("#firmware-form .selected-file") as HTMLDivElement;
+
+        if (!firmwareField.files?.length) {
+            if (!fileLabel.classList.contains('unselected')) fileLabel.classList.add("unselected");
+            fileLabel.textContent = "No file selected.";
+            return;
+        }
+
+        fileLabel.classList.remove('unselected');
+        const file = firmwareField.files[0];
+        fileLabel.textContent = escape(file.name);
+    }
+
+    updateFirmwareLabel();
+    firmwareField.addEventListener('change', () => updateFirmwareLabel());
+
+    const getMd5 = (file: File) => {
+        return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const fileBuf = event.target.result;
+                if (typeof fileBuf === 'string') throw new Error("got string but was expecting file");
+                const hashBuf = md5(fileBuf);
+                resolve(Array.from(new Uint8Array(hashBuf))
+                    .map((b) => b.toString(16).padStart(2, "0"))
+                    .join(""));
+            }
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        })
+    }
+
+    firmwareSubmit.addEventListener('click', async () => {
+        if (!firmwareField.files?.length) {
+            return await cfa.message("No file selected. Please select a firmware (.bin) file and press update again.", "Error");
+        }
+        const file = firmwareField.files[0];
+        const hash = await getMd5(file);
+
+        const body = new FormData();
+        body.append("MD5", hash);
+        body.append("update", file, file.name);
+
+        try {
+            const res = await fetch("/update", { method: "POST", body });
+            if (res.ok) {
+                await cfa.message("update started. Please wait for the device to reboot.");
+                firmwareField.value = '';
+            }
+            else {
+                await cfa.fatal("update failed: " + await res.text());
+            }
+        }
+        catch (e) {
+            await cfa.fatal("Error upgrading: " + e);
+        }
+    })
 });

@@ -216,10 +216,49 @@ aside {
     justify-content: center;
 }
 
-.wifi-form-wrapper {
+div[aria-role=form] {
     display: flex;
     align-items: center;
     flex-direction: column;
+    margin: 1rem;
+}
+
+input[type=file] {
+    display: none;
+}
+
+.file-upload {
+    border: 2px solid gray;
+    padding: 1rem;
+    min-width: 10rem;
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+}
+
+.prompt {
+    margin-top: auto;
+    font-size: 0.9rem;
+    color: gray;
+}
+
+.form-group {
+    width: 100%;
+}
+
+#firmware-form .form-group {
+    justify-content: center;
+}
+
+.selected-file {
+    font-weight: bold;
+    font-style: normal;
+}
+
+.selected-file.unselected {
+    font-weight: normal;
+    font-style: italic;
 }
 
 .networks-container-label {
@@ -274,6 +313,7 @@ aside {
 body {
     background-color: white;
     max-width: 70ch;
+    line-height: 1.6;
 }
 
 details {

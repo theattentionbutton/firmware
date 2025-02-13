@@ -74,8 +74,38 @@
                 </div>
             </div>
         </div>
-
     </details>
+
+    <details id="firmware-update">
+        <summary>Firmware update</summary>
+        <p>This section of the settings allows you to update this Attention Button's firmware. Proceed carefully.</p>
+        <ol>
+            <li>First, power off the Attention Button and visit <a
+                    href="https://theattentionbutton.in/firmware">https://theattentionbutton.in/firmware</a> to download
+                the latest firmware update file. You will be e-mailed in case a new version is available.</li>
+            <li>Download the file to your device. Then power on the Attention Button in settings mode to get back to
+                this
+                page.</li>
+            <li>Upload the firmware update file (likely called attnbtn-fw-20yy-mm-dd.bin) below.</li>
+            <li>Finally, press Submit below. Do not power off the Attention Button during the update. It will restart
+                on its own and automatically reconnect to the configured network.</li>
+        </ol>
+
+        <div aria-role="form" id="firmware-form">
+            <div class="form-group">
+                <label for="firmware-file" class="file-upload">
+                    <div>Firmware file (.bin)</div>
+                    <div class="selected-file unselected">No file selected</div>
+                    <div class="prompt">Click to upload...</div>
+                </label>
+                <input type="file" id="firmware-file" accept=".bin">
+            </div>
+            <div class="submit-group">
+                <button id="firmware-submit" type="button" aria-role="submit">Upload</button>
+            </div>
+        </div>
+    </details>
+
     <script src="main.js"></script>
 </body>
 
