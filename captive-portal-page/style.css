@@ -89,39 +89,43 @@
 html {
     background-color: #ffcac6;
     width: 100%;
-    height: 100%;
+    min-height: 100%;
     color: #303030;
     display: flex;
-    align-items: center;
-    flex-direction: column;
+    justify-content: center;
     margin: 0;
     padding: 0;
 }
 
 h1 {
-    margin-bottom: 1rem;
+    margin-bottom: 2rem;
+    font-size: 1.5rem;
+    margin-top: 0.5rem;
 }
 
 body {
-    padding: 1rem;
-    padding-top: 5rem;
-    max-width: 80ch;
+    padding: 0.25rem;
+    max-width: 70ch;
     margin: 0;
     width: calc(100% - 2rem);
     min-height: calc(100vh - 5rem);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-html {
-    padding-bottom: 3rem;
+body>*:not(#alert-mask) {
+    max-width: 85%;
 }
 
 details {
-    border: 2px solid;
+    border: 2px solid #4c4c4c;
     padding: 1rem;
-    margin-top: 1rem;
-    margin-bottom: 1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
     background-color: #f5f4f0;
+    width: 100%;
 }
 
 details[open] summary {
@@ -129,7 +133,13 @@ details[open] summary {
 }
 
 summary {
+    background-color: #ffcac6;
+    padding: 0.5rem;
+    margin: 0;
+    width: 100%;
+    transform: translateX(-0.5rem);
     cursor: pointer;
+    width: 100%;
 }
 
 input[type=text][id^=secret-token] {
@@ -160,9 +170,9 @@ button:active {
 input[type=text],
 input[type=password] {
     background-color: transparent;
-    border: none;
-    border-bottom: 2px solid gray;
-    padding: 0.2rem;
+    border: 2px solid gray;
+    padding: 0.4rem;
+    border-radius: 0.2rem;
     font-size: 1rem;
 }
 
@@ -259,6 +269,26 @@ aside {
 
 .network {
     max-width: 40ch;
+}
+
+body {
+    background-color: white;
+    max-width: 70ch;
+}
+
+details {
+    padding: 0;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    background-color: transparent;
+}
+
+
+details,
+button,
+input[type=submit],
+input {
+    border-radius: 0.25rem;
 }
 
 @media screen and (max-aspect-ratio: 1/1) {
