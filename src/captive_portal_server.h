@@ -72,47 +72,69 @@ char routes_404[][32] = {
     "/chat",     // No stop asking Whatsapp, there is no internet connection
     "/favicon.ico"};
 
+#define UPDATE_DRY_RUN 0 // set to 1 to not actually perform updates
+
 void handleUpdateUpload(AsyncWebServerRequest *request, String filename,
                         size_t index, uint8_t *data, size_t len, bool final) {
     size_t content_length = request->contentLength();
-    if (!index) {
+
+    if (!index) { // Start of upload
         if (!request->hasParam("MD5", true)) {
             return request->send(400, "text/plain", "MD5 parameter missing");
         }
 
-        if (!Update.setMD5(request->getParam("MD5", true)->value().c_str())) {
+        Serial.printf("[update] Content-Length: %lu\n", content_length);
+        Serial.printf("[update] Flash chip size: %u\n",
+                      ESP.getFlashChipRealSize());
+        Serial.printf("[update] Free sketch space: %u\n",
+                      ESP.getFreeSketchSpace());
+
+        const char *md5 = request->getParam("MD5", true)->value().c_str();
+        Serial.printf("[update] md5: %s\n", md5);
+
+#if UPDATE_DRY_RUN == 0
+        if (!Update.setMD5(md5)) {
             return request->send(400, "text/plain", "MD5 parameter invalid");
         }
 
         if (!Update.begin(content_length, U_FLASH)) {
             Update.printError(Serial);
+            return request->send(500, "text/plain", "OTA Update Begin Failed");
         }
+#endif
+
+        Serial.printf("[update] Starting update\n", content_length, md5);
     }
 
-    for (size_t i = 0; i < len; i++) {
-        if (Update.write(data, len) != len) {
-            Update.printError(Serial);
-        }
-
-        else {
-            Serial.printf("[update] Progress: %d%%\n",
-                          (Update.progress() * 100) / Update.size());
-        }
+    Serial.printf("[update] Free heap: %u bytes\n", ESP.getFreeHeap());
+    Serial.printf("[update] writing chunk %lu\n", index);
+#if UPDATE_DRY_RUN == 0
+    // Write chunk
+    if (Update.write(data, len) != len) {
+        Update.printError(Serial);
+    } else {
+        Serial.printf("[update] Progress: %d%%\n",
+                      (Update.progress() / Update.size()) * 100);
     }
+#endif
 
-    if (final) {
+    if (final) { // End of upload
         AsyncWebServerResponse *response = request->beginResponse(
             302, "application/json", "Please wait while the device reboots");
-        response->addHeader("Refresh", "20");
-        response->addHeader("Location", "/");
         request->send(response);
+
+#if UPDATE_DRY_RUN == 0
         if (!Update.end(true)) {
             Update.printError(Serial);
         } else {
             Serial.println("[update] Update complete");
             Serial.flush();
+            delay(100);
             ESP.restart();
         }
+#else
+        Serial.println("[update] Dry run complete – no reboot.");
+#endif
     }
 }
 
