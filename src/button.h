@@ -48,6 +48,8 @@ int disp_event_delay(DisplayEventType t) {
             return 5000;
         case MESSAGE:
             return 30000;
+        default:
+            break;
     }
 
     return 0;
@@ -119,7 +121,7 @@ class AttentionButton {
         }
 
         if (remaining > 0) {
-            uint8_t last_row_value = (1 << remaining) - 1 << (8 - remaining);
+            uint8_t last_row_value = ((1 << remaining) - 1) << (8 - remaining);
             mx->setRow(full_rows + 1, last_row_value, 0);
         }
     }
